@@ -12,3 +12,4 @@ La versión actual también se ve en Ajustes, abajo del todo.
 - Ajustes: Face ID para bloquear la app, avisos fuera de la app, vibración.
 - Menú al mantener presionado una cuenta, movimiento o meta.
 - Sincronización con la nube (Firebase Firestore, proyecto psnllega).
+- Corrección de compilación: se quitó el producto FirebaseFirestoreSwift, que no existe en firebase-ios-sdk 11.x (su código vive en FirebaseFirestore).

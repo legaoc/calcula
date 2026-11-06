@@ -596,3 +596,28 @@ en "Pendiente" abajo. Archivos en `Calcula/Calcula/`:
 - **Reglas e índices de Firestore**: no verificables desde este repo.
 - La etiqueta de rango de quincena en Swift usa `Format.date`
   ("15 dic 2026 – 30 dic 2026"); la web usa formato corto sin año.
+
+## 14. FIX DE COMPILACIÓN: `FirebaseFirestoreSwift` NO EXISTE EN firebase-ios-sdk 11.x (6 nov 2026)
+
+- **Error de CI**: `error: Missing package product 'FirebaseFirestoreSwift'
+  (in target 'Calcula' from project 'Calcula')`. La anotación de
+  "Code Signing Error" vista antes era una lectura errónea: el log
+  tiene cero coincidencias de "Code Signing".
+- **Causa**: el proyecto pide firebase-ios-sdk >= 11.0.0. En 11.x el
+  producto `FirebaseFirestoreSwift` ya no existe (verificado en el
+  `Package.swift` de la 11.0.0: cero ocurrencias; en la 10.29.0 existe).
+  En 11.x el código Swift de Firestore (`@DocumentID`, Codable) vive
+  dentro del producto `FirebaseFirestore` (target Firestore/Swift/Source),
+  así que basta con `import FirebaseFirestore`.
+- **Cambios**:
+  - `Calcula/Calcula.xcodeproj/project.pbxproj`: eliminada por completo
+    la referencia al producto `FirebaseFirestoreSwift` (su
+    `XCSwiftPackageProductDependency` 00000000000000000000104B, su
+    `PBXBuildFile` 00000000000000000000104A y sus menciones en
+    `packageProductDependencies` y en la fase Frameworks). El paquete
+    firebase-ios-sdk y los productos `FirebaseAuth` y `FirebaseFirestore`
+    quedan intactos. Verificado: cero menciones restantes, llaves y
+    paréntesis balanceados, sin IDs huérfanos.
+  - `DataStore.swift`, `Models.swift`, `NotificationService.swift`:
+    quitada la línea `import FirebaseFirestoreSwift` (queda
+    `import FirebaseFirestore`).
