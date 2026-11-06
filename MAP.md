@@ -621,3 +621,41 @@ en "Pendiente" abajo. Archivos en `Calcula/Calcula/`:
   - `DataStore.swift`, `Models.swift`, `NotificationService.swift`:
     quitada la línea `import FirebaseFirestoreSwift` (queda
     `import FirebaseFirestore`).
+
+## 15. FIX DE COMPILACIÓN: 5 ERRORES SWIFT DEL RUN #11 (6 nov 2026)
+
+El run #11 falló con exit code 65 (3 failures reportadas; 5 errores
+localizados en el código). Ya no sale el error de `FirebaseFirestoreSwift`
+(§14, arreglado). Cambios, solo lo necesario, sin cambiar comportamiento:
+
+1. **GoalsView.swift** — `ShareLink(item: image, ...)` con `UIImage` no
+   compila (UIImage no es Transferable). Nuevo `private struct
+   ShareableImage: Transferable` que exporta la imagen como PNG
+   (`DataRepresentation(contentType: .png)`; `import
+   UniformTypeIdentifiers` agregado) y `ShareLink(item:
+   ShareableImage(image: image), preview: SharePreview(goal.name,
+   image: Image(uiImage: image)))`. El botón sigue compartiendo la
+   imagen de la meta.
+2. **OnboardingView.swift:213 y BiometricLock.swift:64** —
+   `.foregroundStyle(.calculaAccent)` no compila (con la sintaxis de
+   punto el compilador lo busca en ShapeStyle, no en Color). Cambiado a
+   `.foregroundStyle(Color.calculaAccent)` en los dos archivos; grep
+   confirma cero usos restantes de `.foregroundStyle(.calcula*)` en
+   todo el proyecto.
+3. **NotificationService.swift** — agregado `import SwiftUI` (`@AppStorage`
+   es de SwiftUI; el archivo solo importaba Foundation, FirebaseFirestore
+   y UserNotifications).
+4. **DataStore.swift** — `syncDeregister` declarado como `(() -> Void)?`
+   pero `db.addSnapshotsInSyncListener` devuelve `ListenerRegistration`.
+   Declarado ahora como `ListenerRegistration?` y su uso en
+   `stopListening()` cambiado de `syncDeregister?()` a
+   `syncDeregister?.remove()` (únicos usos: líneas 37, 162, 182, 193).
+5. **HomeView.swift** — el compilador no verificaba el tipo del banner
+   "Por pagar" en tiempo razonable. La fila del `ForEach` se extrajo a
+   la subvista `private struct DueReminderRow` (título y detalle ya
+   calculados); el `body` de Inicio quedó más ligero.
+
+Verificado: cero patrones que fallaban (grep), llaves y paréntesis
+balanceados en los 6 archivos editados, otros ShareLink del proyecto
+(String y URL) no afectados. Sin compilador Swift en Linux: la prueba
+real es el siguiente run de GitHub Actions.
