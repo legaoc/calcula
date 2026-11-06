@@ -13,8 +13,9 @@ struct AddMovementView: View {
     @State private var isSaving = false
     @State private var savedTrigger = 0
 
-    init(preselectedAccountId: String? = nil) {
+    init(preselectedAccountId: String? = nil, preselectedKind: String = "cargo") {
         _selectedAccountId = State(initialValue: preselectedAccountId ?? "")
+        _kind = State(initialValue: preselectedKind)
     }
 
     var body: some View {
