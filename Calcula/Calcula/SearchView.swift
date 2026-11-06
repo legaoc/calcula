@@ -4,37 +4,27 @@ import SwiftUI
 /// metas y presupuestos por nombre, nota, categoría, cantidad o fecha.
 /// Los resultados se actualizan en vivo (máx. 40, como la web) y al
 /// tocar uno se abre su detalle.
+/// Desde la 1.2.4 es una vista incrustada en Inicio: el campo vive en la
+/// píldora expandible del encabezado (`HomeView.searchPill`) y esta vista
+/// solo muestra las sugerencias, el estado vacío o los resultados en
+/// línea, sin hoja desde abajo. El destino de cada resultado lo registra
+/// Inicio con `navigationDestination(for: SearchDestination.self)`.
 struct SearchView: View {
     @EnvironmentObject private var store: DataStore
-    @Environment(\.dismiss) private var dismiss
 
-    @State private var query = ""
-    @FocusState private var searchFocused: Bool
+    /// Texto de búsqueda (lo escribe el campo de la píldora del encabezado).
+    @Binding var query: String
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                searchField
-                if trimmedQuery.isEmpty {
-                    hintView
-                } else if sections.isEmpty {
-                    emptyView
-                } else {
-                    resultsList
-                }
-            }
-            .navigationTitle("Buscar")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cerrar") { dismiss() }
-                }
-            }
-            .navigationDestination(for: SearchDestination.self) { destination in
-                destinationView(for: destination)
+        VStack(alignment: .leading, spacing: 0) {
+            if trimmedQuery.isEmpty {
+                hintView
+            } else if sections.isEmpty {
+                emptyView
+            } else {
+                resultsList
             }
         }
-        .onAppear { searchFocused = true }
     }
 
     private var currency: String {
@@ -43,29 +33,6 @@ struct SearchView: View {
 
     private var trimmedQuery: String {
         query.trimmingCharacters(in: .whitespaces)
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField("Buscar cuentas, movimientos, metas…", text: $query)
-                .textInputAutocapitalization(.never)
-                .disableAutocorrection(true)
-                .focused($searchFocused)
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(10)
-        .background(Color.calculaCard)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding()
     }
 
     private var hintView: some View {
@@ -79,7 +46,7 @@ struct SearchView: View {
                 .multilineTextAlignment(.center)
         }
         .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
     }
 
     private var emptyView: some View {
@@ -89,15 +56,26 @@ struct SearchView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
     }
 
+    /// Resultados en línea (sin `List`: esta vista vive dentro del
+    /// `ScrollView` de Inicio, así que usa un `LazyVStack` con
+    /// encabezados de sección y separadores, como el resto de Inicio).
     private var resultsList: some View {
-        List {
+        LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(sections) { section in
-                Section(section.title) {
-                    ForEach(section.rows) { result in
-                        rowView(for: result)
+                Text(section.title)
+                    .font(.headline)
+                    .padding(.horizontal)
+                    .padding(.top, 16)
+                    .padding(.bottom, 4)
+                ForEach(section.rows) { result in
+                    rowView(for: result)
+                        .padding(.horizontal)
+                        .padding(.vertical, 10)
+                    if result.id != section.rows.last?.id {
+                        Divider().padding(.leading, 16)
                     }
                 }
             }
@@ -134,33 +112,6 @@ struct SearchView: View {
             title: "Presupuestos"
         )
         return found
-    }
-
-    @ViewBuilder
-    private func destinationView(for destination: SearchDestination) -> some View {
-        switch destination {
-        case .account(let id):
-            if let account = store.accounts.first(where: { $0.id == id }) {
-                AccountDetailView(account: account)
-            } else {
-                Text("Cuenta no encontrada")
-                    .foregroundStyle(.secondary)
-            }
-        case .goal(let id):
-            if let goal = store.goals.first(where: { $0.id == id }) {
-                GoalDetailView(goal: goal)
-            } else {
-                Text("Meta no encontrada")
-                    .foregroundStyle(.secondary)
-            }
-        case .budget(let id):
-            if let budget = store.budgets.first(where: { $0.id == id }) {
-                BudgetDetailView(budget: budget)
-            } else {
-                Text("Presupuesto no encontrado")
-                    .foregroundStyle(.secondary)
-            }
-        }
     }
 
     private func rowView(for result: SearchResult) -> some View {
@@ -261,8 +212,43 @@ struct SearchView: View {
     }()
 }
 
+/// Vista de destino al tocar un resultado de búsqueda: resuelve el objeto
+/// vivo por id. La registra Inicio con
+/// `.navigationDestination(for: SearchDestination.self)`.
+struct SearchDestinationView: View {
+    @EnvironmentObject private var store: DataStore
+
+    let destination: SearchDestination
+
+    var body: some View {
+        switch destination {
+        case .account(let id):
+            if let account = store.accounts.first(where: { $0.id == id }) {
+                AccountDetailView(account: account)
+            } else {
+                Text("Cuenta no encontrada")
+                    .foregroundStyle(.secondary)
+            }
+        case .goal(let id):
+            if let goal = store.goals.first(where: { $0.id == id }) {
+                GoalDetailView(goal: goal)
+            } else {
+                Text("Meta no encontrada")
+                    .foregroundStyle(.secondary)
+            }
+        case .budget(let id):
+            if let budget = store.budgets.first(where: { $0.id == id }) {
+                BudgetDetailView(budget: budget)
+            } else {
+                Text("Presupuesto no encontrado")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
 /// Destino al tocar un resultado (por id, para resolver el objeto vivo).
-private enum SearchDestination: Hashable {
+enum SearchDestination: Hashable {
     case account(id: String)
     case goal(id: String)
     case budget(id: String)

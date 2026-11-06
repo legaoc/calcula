@@ -9,8 +9,12 @@ struct HomeView: View {
     @State private var movementToDelete: Movement?
     @State private var paymentToPay: ScheduledPayment?
     @State private var showingAccounts = false
-    @State private var showingSearch = false
     @State private var showingPayroll = false
+    /// Búsqueda expandible en el encabezado (1.2.4): la píldora crece
+    /// hasta ocupar la fila y los resultados se muestran en línea.
+    @State private var searchExpanded = false
+    @State private var searchQuery = ""
+    @FocusState private var searchFocused: Bool
     @State private var hapticTrigger = 0
 
     @Environment(\.scenePhase) private var scenePhase
@@ -33,161 +37,167 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     brandHeader
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Total pendiente")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Text(Format.money(store.totalBalance, currency: currency))
-                            .font(.system(size: 34, weight: .bold))
-                        Text("\(store.accounts.count) cuentas")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal)
-
-                    HStack {
-                        Text("Cuentas")
-                            .font(.headline)
-                        Spacer()
-                        Button("Ver todas") { showingAccounts = true }
-                            .font(.subheadline)
-                    }
-                    .padding(.horizontal)
-
-                    if store.visibleAccounts.isEmpty {
-                        Text("Aún no tienes cuentas. Crea una para empezar.")
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
+                    if searchExpanded {
+                        SearchView(query: $searchQuery)
+                            .padding(.top, 4)
                     } else {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(store.visibleAccounts) { account in
-                                    AccountCard(
-                                        account: account,
-                                        payment: store.scheduledPayments.first {
-                                            $0.accountId == account.id
-                                        },
-                                        currentPlan: currentQuincenaPlan,
-                                        nextPlan: nextQuincenaPlan,
-                                        currency: currency
-                                    )
-                                        .onTapGesture { selectedAccount = account }
-                                        .contextMenu {
-                                            Button("Ver movimientos") {
-                                                selectedAccount = account
-                                            }
-                                            Button("Eliminar cuenta", role: .destructive) {
-                                                Task {
-                                                    try? await store.deleteAccount(account)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Total pendiente")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Text(Format.money(store.totalBalance, currency: currency))
+                                .font(.system(size: 34, weight: .bold))
+                            Text("\(store.accounts.count) cuentas")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal)
+
+                        HStack {
+                            Text("Cuentas")
+                                .font(.headline)
+                            Spacer()
+                            Button("Ver todas") { showingAccounts = true }
+                                .font(.subheadline)
+                        }
+                        .padding(.horizontal)
+
+                        if store.visibleAccounts.isEmpty {
+                            Text("Aún no tienes cuentas. Crea una para empezar.")
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal)
+                        } else {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(store.visibleAccounts) { account in
+                                        AccountCard(
+                                            account: account,
+                                            payment: store.scheduledPayments.first {
+                                                $0.accountId == account.id
+                                            },
+                                            currentPlan: currentQuincenaPlan,
+                                            nextPlan: nextQuincenaPlan,
+                                            currency: currency
+                                        )
+                                            .onTapGesture { selectedAccount = account }
+                                            .contextMenu {
+                                                Button("Ver movimientos") {
+                                                    selectedAccount = account
+                                                }
+                                                Button("Eliminar cuenta", role: .destructive) {
+                                                    Task {
+                                                        try? await store.deleteAccount(account)
+                                                    }
                                                 }
                                             }
-                                        }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-
-                    // Aviso ámbar "Por pagar" (WEB-INVENTORY §1): una línea
-                    // por ítem, "En 2 días · Pago semanal · $216.00".
-                    if !upcomingReminders.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Por pagar")
-                                .font(.headline)
-                            ForEach(Array(upcomingReminders.prefix(3))) { item in
-                                HStack(spacing: 8) {
-                                    Image(systemName: "exclamationmark.circle.fill")
-                                        .foregroundStyle(.orange)
-                                    Text("\(relativeDay(item.date)) · \(item.name) · \(Format.money(item.amount, currency: currency))")
-                                        .font(.subheadline)
-                                        .lineLimit(1)
-                                }
-                            }
-                        }
-                        .padding()
-                        .background(Color.orange.opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .padding(.horizontal)
-                    }
-
-                    // "Para estar al día": esta quincena y la siguiente.
-                    HStack {
-                        Text("Para estar al día")
-                            .font(.headline)
-                        Spacer()
-                        Button("Nómina") { showingPayroll = true }
-                            .font(.subheadline)
-                    }
-                    .padding(.horizontal)
-                    VStack(spacing: 12) {
-                        QuincenaCard(windowIndex: quincenaContext.currentIndex, context: quincenaContext)
-                        if quincenaContext.windows.indices.contains(quincenaContext.currentIndex + 1) {
-                            QuincenaCard(windowIndex: quincenaContext.currentIndex + 1, context: quincenaContext)
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    // Próximos pagos (los primeros 5, como la web):
-                    // flecha ↗ ("!" si vencido), nombre, cuenta, fecha
-                    // ("En 2 días · 8 nov 2026"), monto y botón "Pagar".
-                    Text("Próximos pagos")
-                        .font(.headline)
-                        .padding(.horizontal)
-                    if store.scheduledPayments.isEmpty {
-                        Text("No tienes pagos programados.")
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                    } else {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(store.scheduledPayments.prefix(5))) { payment in
-                                let accountName = store.accounts.first { $0.id == payment.accountId }?.name ?? "Cuenta"
-                                let overdue = (payment.nextPayment ?? .distantFuture) < Date()
-                                HStack(spacing: 12) {
-                                    Text(overdue ? "!" : "↗")
-                                        .font(.headline)
-                                        .foregroundStyle(overdue ? .red : .secondary)
-                                        .frame(width: 24)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(payment.name)
-                                            .lineLimit(1)
-                                        Text(accountName)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                        Text(upcomingDateText(payment.nextPayment))
-                                            .font(.caption)
-                                            .foregroundStyle(overdue ? .red : .secondary)
                                     }
-                                    Spacer()
-                                    Text(Format.money(payment.amount, currency: currency))
-                                        .fontWeight(.semibold)
-                                    Button("Pagar") { paymentToPay = payment }
-                                        .buttonStyle(.bordered)
-                                        .controlSize(.small)
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
+                                .padding(.horizontal)
                             }
                         }
-                        .background(Color.calculaCard)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .padding(.horizontal)
-                    }
 
-                    RecentMovementsSection(
-                        movements: recentMovements,
-                        accounts: store.accounts,
-                        currency: currency,
-                        onViewAccount: { movement in
-                            selectedAccount = store.accounts.first {
-                                $0.id == movement.accountId
+                        // Aviso ámbar "Por pagar" (WEB-INVENTORY §1): una línea
+                        // por ítem, "En 2 días · Pago semanal · $216.00".
+                        if !upcomingReminders.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Por pagar")
+                                    .font(.headline)
+                                ForEach(Array(upcomingReminders.prefix(3))) { item in
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "exclamationmark.circle.fill")
+                                            .foregroundStyle(.orange)
+                                        Text("\(relativeDay(item.date)) · \(item.name) · \(Format.money(item.amount, currency: currency))")
+                                            .font(.subheadline)
+                                            .lineLimit(1)
+                                    }
+                                }
                             }
-                        },
-                        onDelete: { movement in movementToDelete = movement }
-                    )
+                            .padding()
+                            .background(Color.orange.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .padding(.horizontal)
+                        }
+
+                        // "Para estar al día": esta quincena y la siguiente.
+                        HStack {
+                            Text("Para estar al día")
+                                .font(.headline)
+                            Spacer()
+                            Button("Nómina") { showingPayroll = true }
+                                .font(.subheadline)
+                        }
+                        .padding(.horizontal)
+                        VStack(spacing: 12) {
+                            QuincenaCard(windowIndex: quincenaContext.currentIndex, context: quincenaContext)
+                            if quincenaContext.windows.indices.contains(quincenaContext.currentIndex + 1) {
+                                QuincenaCard(windowIndex: quincenaContext.currentIndex + 1, context: quincenaContext)
+                            }
+                        }
+                        .padding(.horizontal)
+
+                        // Próximos pagos (los primeros 5, como la web):
+                        // flecha ↗ ("!" si vencido), nombre, cuenta, fecha
+                        // ("En 2 días · 8 nov 2026"), monto y botón "Pagar".
+                        Text("Próximos pagos")
+                            .font(.headline)
+                            .padding(.horizontal)
+                        if store.scheduledPayments.isEmpty {
+                            Text("No tienes pagos programados.")
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal)
+                        } else {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(store.scheduledPayments.prefix(5))) { payment in
+                                    let accountName = store.accounts.first { $0.id == payment.accountId }?.name ?? "Cuenta"
+                                    let overdue = (payment.nextPayment ?? .distantFuture) < Date()
+                                    HStack(spacing: 12) {
+                                        Text(overdue ? "!" : "↗")
+                                            .font(.headline)
+                                            .foregroundStyle(overdue ? .red : .secondary)
+                                            .frame(width: 24)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(payment.name)
+                                                .lineLimit(1)
+                                            Text(accountName)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                            Text(upcomingDateText(payment.nextPayment))
+                                                .font(.caption)
+                                                .foregroundStyle(overdue ? .red : .secondary)
+                                        }
+                                        Spacer()
+                                        Text(Format.money(payment.amount, currency: currency))
+                                            .fontWeight(.semibold)
+                                        Button("Pagar") { paymentToPay = payment }
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.small)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                }
+                            }
+                            .background(Color.calculaCard)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .padding(.horizontal)
+                        }
+
+                        RecentMovementsSection(
+                            movements: recentMovements,
+                            accounts: store.accounts,
+                            currency: currency,
+                            onViewAccount: { movement in
+                                selectedAccount = store.accounts.first {
+                                    $0.id == movement.accountId
+                                }
+                            },
+                            onDelete: { movement in movementToDelete = movement }
+                        )
+                    }
                 }
                 .padding(.vertical)
             }
             .background(Color.calculaBackground)
+            .scrollDismissesKeyboard(.interactively)
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { startGreeting() }
             .onChange(of: store.profile?.name) { _, _ in startGreeting() }
@@ -202,8 +212,8 @@ struct HomeView: View {
                     replayGreeting()
                 }
             }
-            .sheet(isPresented: $showingSearch) {
-                SearchView()
+            .navigationDestination(for: SearchDestination.self) { destination in
+                SearchDestinationView(destination: destination)
             }
             .navigationDestination(item: $selectedAccount) { account in
                 AccountDetailView(account: account)
@@ -235,60 +245,148 @@ struct HomeView: View {
         }
     }
 
-    /// Encabezado de Inicio (MAP.md §21 / web `.brand-mark`): fila propia
-    /// dentro del contenido, no barra de navegación. A la izquierda el
-    /// saludo o el logo DESNUDO, directo sobre el fondo, sin cápsula ni
-    /// burbuja (en la 1.2.2 el logo quedó en un ToolbarItem y en iOS 26
-    /// eso se ve dentro de una burbuja de Liquid Glass); a la derecha los
-    /// botones circulares de buscar y ajustes. La fila mide 44pt fijos
-    /// para que el cambio de saludo a logo no mueva el contenido.
+    /// Encabezado de Inicio (MAP.md §21/§22 / web `.brand-mark`): fila propia
+    /// dentro del contenido, no barra de navegación. Colapsado: a la izquierda
+    /// el saludo o el logo DESNUDO, directo sobre el fondo, sin cápsula ni
+    /// burbuja (en la 1.2.2 el logo quedó en un ToolbarItem y en iOS 26 eso se
+    /// ve dentro de una burbuja de Liquid Glass); en medio la píldora "Buscar"
+    /// y a la derecha el botón circular de ajustes. Al tocar la píldora se
+    /// expande con un spring hasta ocupar la fila, el logo/saludo y ajustes se
+    /// desvanecen y aparece el campo con el teclado y un botón circular X
+    /// (como la barra de búsqueda del video de referencia); los resultados se
+    /// muestran en línea debajo del encabezado, sin hoja desde abajo.
+    /// La fila mide 44pt fijos para que el cambio de saludo a logo no mueva
+    /// el contenido.
     private var brandHeader: some View {
-        HStack {
-            ZStack(alignment: .leading) {
-                Image("CalculaWordmark")
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 28)
-                    .foregroundStyle(.primary)
-                    .accessibilityLabel("Calcula")
-                    .opacity(logoOpacity)
-                    .offset(y: logoOffset)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(greetingPhrase())
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text(firstName ?? "")
-                        .font(.system(size: 18, weight: .bold))
-                        .opacity(nameOpacity)
-                        .offset(y: nameOffset)
+        HStack(spacing: 8) {
+            if !searchExpanded {
+                ZStack(alignment: .leading) {
+                    Image("CalculaWordmark")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 28)
+                        .foregroundStyle(.primary)
+                        .accessibilityLabel("Calcula")
+                        .opacity(logoOpacity)
+                        .offset(y: logoOffset)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(greetingPhrase())
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text(firstName ?? "")
+                            .font(.system(size: 18, weight: .bold))
+                            .opacity(nameOpacity)
+                            .offset(y: nameOffset)
+                    }
+                    .opacity(greetingOpacity)
+                    .offset(y: greetingOffset)
                 }
-                .opacity(greetingOpacity)
-                .offset(y: greetingOffset)
+                .frame(height: 44, alignment: .leading)
+                .transition(.opacity)
+                Spacer()
             }
-            .frame(height: 44, alignment: .leading)
-            Spacer()
-            Button { showingSearch = true } label: {
-                Image(systemName: "magnifyingglass")
-                    .frame(width: 40, height: 40)
-                    .background(Color(.secondarySystemFill))
-                    .clipShape(Circle())
+            searchPill
+            if searchExpanded {
+                Button { collapseSearch() } label: {
+                    Image(systemName: "xmark")
+                        .frame(width: 40, height: 40)
+                        .background(Color(.secondarySystemFill))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                .accessibilityLabel("Cerrar búsqueda")
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+            } else {
+                NavigationLink {
+                    SettingsView()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .frame(width: 40, height: 40)
+                        .background(Color(.secondarySystemFill))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                .transition(.opacity)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.primary)
-            NavigationLink {
-                SettingsView()
-            } label: {
-                Image(systemName: "gearshape")
-                    .frame(width: 40, height: 40)
-                    .background(Color(.secondarySystemFill))
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.primary)
         }
         .padding(.horizontal)
         .padding(.top, 8)
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: searchExpanded)
+    }
+
+    /// Píldora de búsqueda del encabezado (video de referencia): colapsada
+    /// muestra lupa + "Buscar" con su ancho intrínseco; expandida ocupa
+    /// toda la fila y muestra el campo de texto. Es la misma vista en los
+    /// dos estados para que el cambio de ancho se anime con el spring.
+    private var searchPill: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            if searchExpanded {
+                TextField("Buscar cuentas, movimientos, metas…", text: $searchQuery)
+                    .textInputAutocapitalization(.never)
+                    .disableAutocorrection(true)
+                    .focused($searchFocused)
+                    .submitLabel(.search)
+            } else {
+                Text("Buscar")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 40)
+        .frame(maxWidth: searchExpanded ? .infinity : nil)
+        .background(Color(.secondarySystemFill))
+        .clipShape(Capsule())
+        .contentShape(Capsule())
+        .accessibilityLabel("Buscar")
+        .onTapGesture {
+            if !searchExpanded { expandSearch() }
+        }
+    }
+
+    /// Expande la píldora de búsqueda: deja el logo fijo si el saludo
+    /// estaba en curso (para no cruzar animaciones) y abre el teclado
+    /// cuando el campo ya existe en la jerarquía.
+    private func expandSearch() {
+        finishGreeting()
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            searchExpanded = true
+        }
+        Task {
+            try? await Task.sleep(for: .milliseconds(120))
+            guard searchExpanded else { return }
+            searchFocused = true
+        }
+    }
+
+    /// Contrae la píldora: limpia el texto, cierra el teclado y restaura
+    /// logo/saludo y ajustes con la animación inversa.
+    private func collapseSearch() {
+        searchQuery = ""
+        searchFocused = false
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            searchExpanded = false
+        }
+    }
+
+    /// Deja el logo fijo y cancela el saludo en curso (1.2.3), para que al
+    /// abrir la búsqueda no se crucen las animaciones del saludo y de la
+    /// píldora. Si el perfil aún no cargó, `startGreeting` ya no arranca
+    /// el saludo mientras la búsqueda esté abierta (queda el logo).
+    private func finishGreeting() {
+        greetingTask?.cancel()
+        greetingTask = nil
+        greetingPhase = .done
+        greetingOpacity = 0
+        greetingOffset = 0
+        nameOpacity = 0
+        nameOffset = 0
+        logoOpacity = 1
+        logoOffset = 0
     }
 
     /// Frase del saludo según la hora, como `greetingPhrase` de la web:
@@ -320,6 +418,14 @@ struct HomeView: View {
                 logoOpacity = 1
                 logoOffset = 0
             }
+            return
+        }
+        if searchExpanded {
+            // La búsqueda está abierta: sin saludo, queda el logo directo.
+            greetingPhase = .done
+            greetingOpacity = 0
+            logoOpacity = 1
+            logoOffset = 0
             return
         }
         greetingPhase = .playing
