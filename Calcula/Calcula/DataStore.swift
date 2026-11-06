@@ -1,6 +1,5 @@
 import Foundation
 import FirebaseFirestore
-import FirebaseFirestoreSwift
 
 /// Capa de datos Firestore (mismo modelo que la web).
 /// Rutas: users/{uid}/accounts, users/{uid}/movements, etc.

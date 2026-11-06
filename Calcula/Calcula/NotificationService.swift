@@ -1,6 +1,5 @@
 import Foundation
 import FirebaseFirestore
-import FirebaseFirestoreSwift
 import UserNotifications
 
 /// Avisos fuera de la app para pagos programados (UNUserNotificationCenter).

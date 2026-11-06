@@ -1,6 +1,5 @@
 import Foundation
 import FirebaseFirestore
-import FirebaseFirestoreSwift
 
 // MARK: - Modelos Firestore (mismo proyecto `psnllega`, mismas colecciones
 // y campos que la versión web: users/{uid}/<colección>/<doc>).
