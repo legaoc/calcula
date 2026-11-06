@@ -243,7 +243,7 @@ struct QuincenaCard: View {
         isCurrent ? Color.white.opacity(0.08) : Color(.tertiarySystemFill)
     }
 
-    private var body: some View {
+    var body: some View {
         Group {
             if let plan {
                 NavigationLink {

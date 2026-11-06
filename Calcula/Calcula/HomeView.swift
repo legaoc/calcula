@@ -440,7 +440,7 @@ struct AccountCard: View {
             amount: dues.map(\.amount).reduce(0, +),
             share: mine.map(\.share).reduce(0, +),
             isDue: !dues.isEmpty,
-            overdue: mine.contains(\.overdue),
+            overdue: mine.contains(where: \.overdue),
             due: base.due,
             unitAmount: base.unitAmount
         )
