@@ -1011,3 +1011,67 @@ proyecto, no es de Calcula).
 6. **Versión** — MARKETING_VERSION 1.2.2 y CURRENT_PROJECT_VERSION 5
    (Debug y Release, pbxproj + Info.plist). CHANGELOG.md con la entrada
    de la 1.2.2 (2026-11-06).
+
+## 21. VERSIÓN 1.2.3: SALUDO EN INICIO QUE SE CONVIERTE EN LOGO, COMO LA WEB (6 nov 2026)
+
+Pedido por Jesus tras probar la 1.2.2, con un video de referencia: el
+encabezado de Inicio debe saludar y luego desaparecer y aparecer el logo,
+y el logo NO debe ir en una burbuja, sino afuera, directo sobre el fondo,
+como en el video. La web ya hace exactamente esto y se replicó su lógica
+(`greetingPhrase`, `displayName`, `firstName`, `startGreeting`,
+`replayGreeting`, `visibilitychange`; `.brand-mark` con `.brand-hello` y
+`.brand-wordmark`).
+
+### Referencia verificada (web + video)
+- Video (3.5 s): a los 0.0 s "Buenas tardes / Daniel" (frase en regular,
+  nombre en negrita y más grande, dos líneas, sin burbuja); a mitad el
+  saludo se desvanece y se cruza con el logo; al final queda solo el logo
+  "Calcula", desnudo sobre el fondo, con los botones circulares de buscar
+  y ajustes a la derecha.
+- Web, `.brand-mark`: flex, min-height 36px; `.brand-hello` columna con
+  line-height 1.1; `strong` (nombre) 18px, peso 780, con entrada
+  `helloIn .5s ease .12s` (la frase `.hello-line` no tiene animación de
+  entrada: aparece directa); `.brand-hello.is-out` es `helloOut .4s`
+  (opacidad 0, translateY -7px); `.brand-wordmark.brand-in` es `helloIn
+  .48s` (desde opacidad 0, translateY 8px). En claro el wordmark se
+  invierte (`filter:invert(1)`); en Swift eso es template + primary.
+- Web, tiempos: a los 2400 ms el saludo empieza a desvanecerse; 380 ms
+  después el logo entra. Solo se reproduce una vez; si la app vuelve de
+  segundo plano tras 25 s o más oculta, el saludo se vuelve a reproducir
+  (`visibilitychange` + `greetingHideAt`).
+- Frase por hora: 5–12 "Buenos días", 12–19 "Buenas tardes", resto
+  "Buenas noches". Nombre: primer nombre del perfil (`profile.name`); si
+  no hay nombre, se muestra el logo directo (en Swift no hay fallback a
+  `displayName` de Auth: DataStore no lo expone).
+
+### Cambios (`HomeView.swift`)
+1. **Encabezado fuera de la barra de navegación** — Se quitaron
+   `.navigationBarTitleDisplayMode(.inline)` y el `.toolbar` completo
+   (el wordmark estaba en un `ToolbarItem` y en iOS 26 eso se ve dentro
+   de una burbuja de Liquid Glass). Ahora `brandHeader` es una fila
+   propia dentro del `ScrollView`, arriba del todo: a la izquierda el
+   saludo o el logo, a la derecha los botones circulares de buscar y
+   ajustes. La barra de navegación se oculta
+   (`.toolbar(.hidden, for: .navigationBar)`); las pantallas que se
+   empujan (detalle de cuenta, cuentas) muestran su propia barra.
+2. **`brandHeader`** — `HStack` con un `ZStack` a la izquierda (logo y
+   saludo superpuestos, misma posición) y los botones a la derecha. Fila
+   de 44pt fijos para que el cambio de saludo a logo no mueva el
+   contenido. Botones circulares de 40pt con
+   `Color(.secondarySystemFill)`, como los de la web y el video.
+3. **Saludo con temporizador** — `GreetingPhase` (pending / playing /
+   done) + opacidades y offsets (`greetingOpacity/Offset`,
+   `nameOpacity/Offset`, `logoOpacity/Offset`) + `greetingTask`.
+   `startGreeting()`: si no hay nombre y el perfil ya cargó, logo
+   directo; si el perfil aún no cargó, no hace nada y se reintenta con
+   `.onChange` de `store.profile?.name` y de `store.profileLoaded`.
+   Al arrancar: frase directa, nombre con entrada (easeOut .5s, delay
+   .12s); a los 2400 ms el saludo se desvanece (easeOut .4s, offset -7);
+   380 ms después entra el logo (easeIn .48s, desde offset +8).
+   `replayGreeting()` se dispara con `scenePhase`: al volver a activo
+   tras 25 s o más en segundo plano.
+4. **Sin assets nuevos** — se reutiliza `Image("CalculaWordmark")`
+   (template + primary) de la 1.2.2.
+5. **Versión** — MARKETING_VERSION 1.2.3 y CURRENT_PROJECT_VERSION 6
+   (Debug y Release, pbxproj + Info.plist). CHANGELOG.md con la entrada
+   de la 1.2.3 (2026-11-06).

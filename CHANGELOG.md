@@ -3,6 +3,10 @@
 La app muestra este historial en Ajustes → Historial de versiones.
 La versión actual también se ve en Ajustes, abajo del todo.
 
+## 1.2.3 — 2026-11-06 — Saludo en Inicio que se convierte en logo, como la web
+- Inicio: el encabezado ahora saluda ("Buenos días" / "Buenas tardes" / "Buenas noches" + primer nombre del perfil, frase en regular y nombre en negrita y más grande) y a los 2.4 s se desvanece para dar paso al logo "Calcula" con su animación de entrada, como la web. Si no hay nombre, muestra el logo directo. Si la app vuelve de segundo plano tras 25 s o más, el saludo se reproduce de nuevo.
+- El logo ya no va en la barra de navegación (ahí se veía dentro de una burbuja): ahora es una fila propia dentro del contenido, con el logo desnudo directo sobre el fondo y los botones circulares de buscar y ajustes a la derecha, como en la web.
+
 ## 1.2.2 — 2026-11-06 — Logo real de Calcula en el encabezado y en el ícono de la app
 - Inicio: el encabezado ya no dice "Inicio"; muestra el wordmark "Calcula" de la web arriba a la izquierda, junto a los botones de buscar y ajustes. Se ve bien en claro y en oscuro (se tiñe con el color del sistema).
 - Ícono de la app: ya no es la "C" dorada; ahora es el ícono real de Calcula (la "C" ornamentada en gris claro sobre negro).
