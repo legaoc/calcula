@@ -10,6 +10,7 @@ struct HomeView: View {
     @State private var paymentToPay: ScheduledPayment?
     @State private var showingAccounts = false
     @State private var showingSearch = false
+    @State private var showingPayroll = false
     @State private var hapticTrigger = 0
 
     var body: some View {
@@ -71,28 +72,37 @@ struct HomeView: View {
                         }
                     }
 
-                    // Banner de recordatorios ("Por pagar", MAP.md §4.10).
+                    // Aviso ámbar "Por pagar" (WEB-INVENTORY §1): una línea
+                    // por ítem, "En 2 días · Pago semanal · $216.00".
                     if !upcomingReminders.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Por pagar")
                                 .font(.headline)
                             ForEach(Array(upcomingReminders.prefix(3))) { item in
-                                DueReminderRow(
-                                    title: item.name,
-                                    detail: "\(relativeDay(item.date)) · \(Format.money(item.amount, currency: currency))"
-                                )
+                                HStack(spacing: 8) {
+                                    Image(systemName: "exclamationmark.circle.fill")
+                                        .foregroundStyle(.orange)
+                                    Text("\(relativeDay(item.date)) · \(item.name) · \(Format.money(item.amount, currency: currency))")
+                                        .font(.subheadline)
+                                        .lineLimit(1)
+                                }
                             }
                         }
                         .padding()
-                        .background(Color.calculaCard)
+                        .background(Color.orange.opacity(0.15))
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                         .padding(.horizontal)
                     }
 
                     // "Para estar al día": esta quincena y la siguiente.
-                    Text("Para estar al día")
-                        .font(.headline)
-                        .padding(.horizontal)
+                    HStack {
+                        Text("Para estar al día")
+                            .font(.headline)
+                        Spacer()
+                        Button("Nómina") { showingPayroll = true }
+                            .font(.subheadline)
+                    }
+                    .padding(.horizontal)
                     VStack(spacing: 12) {
                         QuincenaCard(windowIndex: quincenaContext.currentIndex, context: quincenaContext)
                         if quincenaContext.windows.indices.contains(quincenaContext.currentIndex + 1) {
@@ -101,20 +111,35 @@ struct HomeView: View {
                     }
                     .padding(.horizontal)
 
-                    // Próximos pagos (los primeros 5, como la web).
-                    if !store.scheduledPayments.isEmpty {
-                        Text("Próximos pagos")
-                            .font(.headline)
+                    // Próximos pagos (los primeros 5, como la web):
+                    // flecha ↗ ("!" si vencido), nombre, cuenta, fecha
+                    // ("En 2 días · 8 nov 2026"), monto y botón "Pagar".
+                    Text("Próximos pagos")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    if store.scheduledPayments.isEmpty {
+                        Text("No tienes pagos programados.")
+                            .foregroundStyle(.secondary)
                             .padding(.horizontal)
+                    } else {
                         LazyVStack(spacing: 0) {
                             ForEach(Array(store.scheduledPayments.prefix(5))) { payment in
-                                HStack {
+                                let accountName = store.accounts.first { $0.id == payment.accountId }?.name ?? "Cuenta"
+                                let overdue = (payment.nextPayment ?? .distantFuture) < Date()
+                                HStack(spacing: 12) {
+                                    Text(overdue ? "!" : "↗")
+                                        .font(.headline)
+                                        .foregroundStyle(overdue ? .red : .secondary)
+                                        .frame(width: 24)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(payment.name)
                                             .lineLimit(1)
-                                        Text(Format.date(payment.nextPayment))
+                                        Text(accountName)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
+                                        Text(upcomingDateText(payment.nextPayment))
+                                            .font(.caption)
+                                            .foregroundStyle(overdue ? .red : .secondary)
                                     }
                                     Spacer()
                                     Text(Format.money(payment.amount, currency: currency))
@@ -185,25 +210,11 @@ struct HomeView: View {
             } message: {
                 Text("Esta acción no se puede deshacer. El saldo de la cuenta se ajustará.")
             }
-            .alert(
-                "Pagar",
-                isPresented: Binding(
-                    get: { paymentToPay != nil },
-                    set: { if !$0 { paymentToPay = nil } }
-                )
-            ) {
-                Button("Pagar") {
-                    Task {
-                        if let payment = paymentToPay {
-                            try? await store.payScheduled(payment)
-                            hapticTrigger += 1
-                        }
-                        paymentToPay = nil
-                    }
-                }
-                Button("Cancelar", role: .cancel) { paymentToPay = nil }
-            } message: {
-                Text("Se registrará el pago y avanzará la próxima fecha de cobro.")
+            .sheet(item: $paymentToPay) { payment in
+                MarkPaymentSheet(payment: payment)
+            }
+            .sheet(isPresented: $showingPayroll) {
+                PayrollSheet()
             }
             .sensoryFeedback(.impact, trigger: hapticTrigger)
         }
@@ -279,6 +290,8 @@ struct HomeView: View {
         return items.sorted { $0.date < $1.date }
     }
 
+    /// "Hoy" / "Mañana" / "En N días" / "Vencido ayer" / "Vencido hace N
+    /// días" o fecha corta, como `dateDescription` de la web.
     private func relativeDay(_ date: Date) -> String {
         let days = Calendar.current.dateComponents(
             [.day],
@@ -286,11 +299,20 @@ struct HomeView: View {
             to: QuincenaEngine.startOfDay(date)
         ).day ?? 0
         switch days {
+        case ..<(-1): return "Vencido hace \(-days) días"
+        case -1: return "Vencido ayer"
         case 0: return "Hoy"
         case 1: return "Mañana"
-        case ..<0: return "Vencido"
-        default: return "En \(days) días"
+        case 2..<7: return "En \(days) días"
+        default: return Format.shortDate(date)
         }
+    }
+
+    /// "En 2 días · 8 nov 2026" / "15 nov · 15 nov 2026", como
+    /// `dateDescription` + `formatDate` de la web.
+    private func upcomingDateText(_ date: Date?) -> String {
+        guard let date else { return "" }
+        return "\(relativeDay(date)) · \(Format.date(date))"
     }
 
     /// Moneda global del perfil (MXN por defecto, como la web).
@@ -317,24 +339,6 @@ private struct ReminderItem: Identifiable {
     var name: String
     var date: Date
     var amount: Double
-}
-
-/// Fila del banner "Por pagar" (extraída del body de Inicio para que el
-/// compilador verifique el tipo en tiempo razonable).
-private struct DueReminderRow: View {
-    let title: String
-    let detail: String
-
-    var body: some View {
-        HStack {
-            Text(title)
-                .lineLimit(1)
-            Spacer()
-            Text(detail)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-    }
 }
 
 /// Lista de movimientos recientes en Inicio (extraída del body para que el
@@ -594,5 +598,85 @@ struct MovementRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+}
+
+// MARK: - Hoja "Marcar pago" (WEB-INVENTORY §3)
+// Desde "Pagar" en Próximos pagos, "Registrar pago" en detalle de cuenta
+// y "Pagar" en detalle de quincena: monto, "Programado para…",
+// "Cancelar" y "Marcar como pagado" (registra el pago de verdad:
+// movimiento type "pago" + avanza nextPayment, igual que la web).
+struct MarkPaymentSheet: View {
+    @EnvironmentObject private var store: DataStore
+    @Environment(\.dismiss) private var dismiss
+
+    let payment: ScheduledPayment
+    /// "Pago 1 de 3" cuando hay varias ocurrencias vencidas (detalle de
+    /// quincena); si no, la frecuencia ("Cada semana").
+    var occurrenceText: String? = nil
+
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private var currency: String { store.profile?.currency ?? "MXN" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Marcar pago")
+                .font(.title2.bold())
+            Text("\(payment.name) · \(occurrenceText ?? QuincenaEngine.frequencyLabel(payment.frequency))")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Monto")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(Format.money(payment.amount, currency: currency))
+                    .font(.system(size: 29, weight: .bold))
+                Text("Programado para \(Format.date(payment.nextPayment))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.tertiarySystemFill))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+
+            Spacer()
+
+            HStack(spacing: 12) {
+                Button("Cancelar") { dismiss() }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
+                Button("Marcar como pagado") {
+                    Task { await markPaid() }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color.calculaAccent)
+                .frame(maxWidth: .infinity)
+                .disabled(isSaving)
+            }
+        }
+        .padding()
+        .presentationDetents([.medium])
+    }
+
+    private func markPaid() async {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            try await store.payScheduled(payment)
+            dismiss()
+        } catch {
+            errorMessage = "No se pudo registrar el pago"
+        }
     }
 }

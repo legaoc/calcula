@@ -1,9 +1,11 @@
 import SwiftUI
+import UIKit
 
-/// Ajustes (mismas secciones que la web, MAP.md §3.7).
-/// "Nuevo presupuesto" y "Nueva meta" no viven aquí: solo se indica que
-/// están disponibles en Finanzas. "Acceso para Atajos" no se implementa
-/// (dato sensible; ver MAP.md §2).
+/// Ajustes con acordeón de 7 filas (WEB-INVENTORY §11): Cuentas, Dinero,
+/// Apariencia, Recordatorios, Exportar, Sistema y Cerrar sesión. Solo una
+/// sección expandida a la vez. "Acceso para Atajos" no se implementa
+/// (dato sensible; ver MAP.md §2). Sincronización y Face ID viven dentro
+/// de Sistema (antes eran secciones propias).
 struct SettingsView: View {
     @EnvironmentObject private var store: DataStore
     @EnvironmentObject private var auth: AuthViewModel
@@ -13,8 +15,11 @@ struct SettingsView: View {
     /// Misma clave que la web (`calcula-dark`).
     @AppStorage("calcula-dark") private var darkMode = false
 
+    @State private var expanded: SettingsRow?
     @State private var showingAddAccount = false
     @State private var showingProfile = false
+    @State private var showingNewBudget = false
+    @State private var showingNewGoal = false
     @State private var showingSignOutConfirm = false
     @State private var syncing = false
     @State private var monthCSVURL: URL?
@@ -22,33 +27,55 @@ struct SettingsView: View {
     @State private var calendarURL: URL?
 
     var body: some View {
-        Form {
-            accountsSection
-            moneySection
-            appearanceSection
-            remindersSection
-            exportSection
-            syncSection
-            securitySection
-            historySection
-            systemSection
+        ScrollView {
+            VStack(spacing: 12) {
+                ForEach(SettingsRow.allCases) { row in
+                    accordionRow(row)
+                }
 
-            Section {
-                Text(AppVersion.display)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Text("App 100% nativa en SwiftUI")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                // Pie: historial y versión (fuera del acordeón).
+                VStack(alignment: .leading, spacing: 8) {
+                    NavigationLink {
+                        VersionHistoryView()
+                    } label: {
+                        HStack {
+                            Text("Historial de versiones")
+                            Spacer()
+                            Text(AppVersion.short)
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    Text(AppVersion.display)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text("App 100% nativa en SwiftUI")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding()
+                .background(Color.calculaCard)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
+            .padding()
         }
+        .background(Color.calculaBackground)
         .navigationTitle("Ajustes")
         .preferredColorScheme(darkMode ? .dark : .light)
         .sheet(isPresented: $showingAddAccount) {
             AddAccountView()
         }
         .sheet(isPresented: $showingProfile) {
-            ProfileEditView(profile: store.profile)
+            OnboardingView(editing: true)
+        }
+        .sheet(isPresented: $showingNewBudget) {
+            BudgetFormView()
+        }
+        .sheet(isPresented: $showingNewGoal) {
+            GoalFormView()
         }
         .task {
             await notifications.refreshAuthorizationStatus()
@@ -70,124 +97,206 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Cuentas
+    // MARK: - Acordeón
 
-    private var accountsSection: some View {
-        Section("Cuentas") {
-            Button("Nueva cuenta") {
-                showingAddAccount = true
+    private enum SettingsRow: String, CaseIterable, Identifiable {
+        case accounts, money, appearance, reminders, export, system, signOut
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .accounts: return "Cuentas"
+            case .money: return "Dinero"
+            case .appearance: return "Apariencia"
+            case .reminders: return "Recordatorios"
+            case .export: return "Exportar"
+            case .system: return "Sistema"
+            case .signOut: return "Cerrar sesión"
             }
+        }
+    }
 
-            if store.accounts.isEmpty {
-                Text("Aún no tienes cuentas.")
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("Tarjetas del inicio")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                ForEach(store.accounts) { account in
-                    Toggle(isOn: hiddenBinding(for: account)) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(account.name)
-                            Text(account.isSubscription ? "Subscripción" : account.isRecurring ? "Pago recurrente" : "Cargos y abonos")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+    private func subtitle(for row: SettingsRow) -> String {
+        switch row {
+        case .accounts: return "Nueva, orden y visibilidad"
+        case .money: return "Perfil, presupuestos y metas"
+        case .appearance: return "Modo nocturno"
+        case .reminders: return "\(store.reminderSettings.daysBefore) días antes"
+        case .export: return "Movimientos en CSV"
+        case .system: return "Actualizar, sincronización y seguridad"
+        case .signOut: return "Sale de esta cuenta"
+        }
+    }
+
+    @ViewBuilder
+    private func accordionRow(_ row: SettingsRow) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation {
+                    if row == .signOut {
+                        showingSignOutConfirm = true
+                    } else {
+                        expanded = expanded == row ? nil : row
                     }
                 }
-                NavigationLink("Orden de tarjetas") {
-                    ReorderAccountsView()
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.title)
+                            .font(.headline)
+                            .foregroundStyle(row == .signOut ? .red : .primary)
+                        Text(subtitle(for: row))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if row != .signOut {
+                        Image(systemName: "chevron.right")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .rotationEffect(.degrees(expanded == row ? 90 : 0))
+                    }
+                }
+                .padding()
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if expanded == row {
+                Divider().padding(.horizontal)
+                content(for: row)
+                    .padding()
+            }
+        }
+        .background(Color.calculaCard)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    @ViewBuilder
+    private func content(for row: SettingsRow) -> some View {
+        switch row {
+        case .accounts: accountsContent
+        case .money: moneyContent
+        case .appearance: appearanceContent
+        case .reminders: remindersContent
+        case .export: exportContent
+        case .system: systemContent
+        case .signOut: EmptyView()
+        }
+    }
+
+    /// Fila de submenú: título + subtítulo (como las subfilas de la web).
+    private func menuRow(title: String, subtitle: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Cuentas
+
+    private var accountsContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Button { showingAddAccount = true } label: {
+                menuRow(title: "Nueva cuenta", subtitle: "Cargos, pago o subscripción")
+            }
+            NavigationLink { HomeCardsView() } label: {
+                HStack {
+                    menuRow(title: "Tarjetas del inicio", subtitle: "Cuáles se ven, color e icono")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            NavigationLink { ReorderAccountsView() } label: {
+                HStack {
+                    menuRow(title: "Orden de tarjetas", subtitle: "Reorganiza las cuentas")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
     }
 
-    private func hiddenBinding(for account: Account) -> Binding<Bool> {
-        Binding(
-            get: {
-                store.accounts.first { $0.id == account.id }?.hiddenFromHome
-                    ?? account.hiddenFromHome
-            },
-            set: { hidden in
-                Task {
-                    try? await store.setAccountHidden(account, hidden: hidden)
-                }
-            }
-        )
-    }
-
     // MARK: - Dinero
 
-    private var moneySection: some View {
-        Section("Dinero") {
-            Button("Mi perfil") {
-                showingProfile = true
+    private var moneyContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Button { showingProfile = true } label: {
+                menuRow(title: "Mi perfil", subtitle: "\(incomeLabel) · \(store.profile?.currency ?? "MXN")")
             }
-            HStack {
-                Text("Nuevo presupuesto")
-                Spacer()
-                Text("Disponible en Finanzas")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            Button { showingNewBudget = true } label: {
+                menuRow(title: "Nuevo presupuesto", subtitle: "Tope del mes por categoría")
             }
-            HStack {
-                Text("Nueva meta")
-                Spacer()
-                Text("Disponible en Finanzas")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            Button { showingNewGoal = true } label: {
+                menuRow(title: "Nueva meta", subtitle: "Ahorro a plazo")
             }
+        }
+    }
+
+    private var incomeLabel: String {
+        switch store.profile?.income {
+        case "daily": return "Diario"
+        case "weekly": return "Semanal"
+        case "monthly": return "Mensual"
+        default: return "Quincenal"
         }
     }
 
     // MARK: - Apariencia
 
-    private var appearanceSection: some View {
-        Section("Apariencia") {
-            Toggle("Modo nocturno", isOn: $darkMode)
+    private var appearanceContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Toggle(isOn: $darkMode) {
+                menuRow(title: "Modo nocturno", subtitle: "Fondo oscuro para la app")
+            }
         }
     }
 
     // MARK: - Recordatorios
 
-    private var remindersSection: some View {
-        Section("Recordatorios") {
-            Toggle("Activar", isOn: Binding(
-                get: { store.reminderSettings.enabled },
-                set: { enabled in
-                    Task {
-                        try? await store.setReminderSettings(
-                            ReminderSettings(
-                                enabled: enabled,
-                                daysBefore: store.reminderSettings.daysBefore
-                            )
-                        )
-                    }
-                }
-            ))
-
-            Picker("Antelación", selection: Binding(
-                get: { store.reminderSettings.daysBefore },
-                set: { days in
-                    Task {
-                        try? await store.setReminderSettings(
-                            ReminderSettings(
-                                enabled: store.reminderSettings.enabled,
-                                daysBefore: days
-                            )
-                        )
-                    }
-                }
-            )) {
-                Text("1 día").tag(1)
-                Text("2 días").tag(2)
+    private var remindersContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Toggle(isOn: reminderEnabledBinding) {
+                menuRow(title: "Activar", subtitle: "Avisar \(store.reminderSettings.daysBefore) días antes")
             }
-            .pickerStyle(.segmented)
 
-            Toggle("Avisos fuera de la app", isOn: $notifications.remindersEnabled)
-            Text("Avisa a las 9:00 del día en que toca un pago programado.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Antelación")
+                    .font(.subheadline.weight(.semibold))
+                Picker("Antelación", selection: daysBeforeBinding) {
+                    Text("1 día").tag(1)
+                    Text("2 días").tag(2)
+                }
+                .pickerStyle(.segmented)
+                Text("1 o 2 días antes del pago")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                menuRow(title: "Avisos en la app", subtitle: "Salen dentro de Calcula")
+                Spacer()
+                if store.reminderSettings.enabled {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+            }
+
+            Toggle(isOn: $notifications.remindersEnabled) {
+                menuRow(title: "Avisos fuera de la app", subtitle: "Avisa a las 9:00 del día en que toca un pago")
+            }
 
             Button("Agregar a Calendario") {
                 calendarURL = Self.buildCalendarFile(
@@ -207,16 +316,50 @@ struct SettingsView: View {
         }
     }
 
+    private var reminderEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { store.reminderSettings.enabled },
+            set: { enabled in
+                Task {
+                    try? await store.setReminderSettings(
+                        ReminderSettings(
+                            enabled: enabled,
+                            daysBefore: store.reminderSettings.daysBefore
+                        )
+                    )
+                }
+            }
+        )
+    }
+
+    private var daysBeforeBinding: Binding<Int> {
+        Binding(
+            get: { store.reminderSettings.daysBefore },
+            set: { days in
+                Task {
+                    try? await store.setReminderSettings(
+                        ReminderSettings(
+                            enabled: store.reminderSettings.enabled,
+                            daysBefore: days
+                        )
+                    )
+                }
+            }
+        )
+    }
+
     // MARK: - Exportar
 
-    private var exportSection: some View {
-        Section("Exportar") {
-            Button("CSV mes") {
+    private var exportContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Button { 
                 monthCSVURL = Self.buildCSVFile(
                     name: "calcula-mes.csv",
                     movements: Self.monthMovements(store.financeMovements),
                     accounts: store.accounts
                 )
+            } label: {
+                menuRow(title: "Exportar mes", subtitle: "CSV de movimientos")
             }
             if let monthCSVURL {
                 ShareLink(item: monthCSVURL, preview: SharePreview("calcula-mes.csv")) {
@@ -224,7 +367,7 @@ struct SettingsView: View {
                 }
             }
 
-            Button("CSV quincena") {
+            Button {
                 let context = QuincenaEngine.currentAndNext(
                     now: Date(), settings: store.payroll
                 )
@@ -235,6 +378,8 @@ struct SettingsView: View {
                     ),
                     accounts: store.accounts
                 )
+            } label: {
+                menuRow(title: "Exportar quincena", subtitle: "CSV de esta quincena")
             }
             if let quincenaCSVURL {
                 ShareLink(item: quincenaCSVURL, preview: SharePreview("calcula-quincena.csv")) {
@@ -247,67 +392,58 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Sincronización
+    // MARK: - Sistema (incluye Sincronización y Seguridad, antes secciones propias)
 
-    private var syncSection: some View {
-        Section("Sincronización") {
-            HStack {
-                Text("Estado")
-                Spacer()
-                Text(store.isListening ? "Conectado" : "Sin conexión")
-                    .foregroundStyle(store.isListening ? .green : .secondary)
-            }
-            HStack {
-                Text("Sincronizado")
-                Spacer()
-                Text(store.syncInSync ? "Al día" : "Pendiente")
-                    .foregroundStyle(store.syncInSync ? .green : .secondary)
-            }
-            HStack {
-                Text("Última sincronización")
-                Spacer()
-                Text(lastSyncText)
+    private var systemContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Actualizar app")
+                    .font(.subheadline.weight(.semibold))
+                Text("En esta versión, la app se actualiza desde FlareStore. Cuando haya una versión nueva, aparecerá ahí.")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Toggle("Sincronizar con la nube", isOn: Binding(
-                get: { store.cloudSyncEnabled },
-                set: { store.setCloudSync(enabled: $0) }
-            ))
-            Button(syncing ? "Sincronizando…" : "Sincronizar ahora") {
-                Task {
-                    syncing = true
-                    await store.syncNow()
-                    syncing = false
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Sincronización")
+                    .font(.subheadline.weight(.semibold))
+                HStack {
+                    Text("Estado")
+                    Spacer()
+                    Text(store.isListening ? "Conectado" : "Sin conexión")
+                        .foregroundStyle(store.isListening ? .green : .secondary)
+                }
+                HStack {
+                    Text("Sincronizado")
+                    Spacer()
+                    Text(store.syncInSync ? "Al día" : "Pendiente")
+                        .foregroundStyle(store.syncInSync ? .green : .secondary)
+                }
+                HStack {
+                    Text("Última sincronización")
+                    Spacer()
+                    Text(lastSyncText)
+                        .foregroundStyle(.secondary)
+                }
+                Toggle("Sincronizar con la nube", isOn: Binding(
+                    get: { store.cloudSyncEnabled },
+                    set: { store.setCloudSync(enabled: $0) }
+                ))
+                Button(syncing ? "Sincronizando…" : "Sincronizar ahora") {
+                    Task {
+                        syncing = true
+                        await store.syncNow()
+                        syncing = false
+                    }
+                }
+                .disabled(syncing)
+                if let error = store.lastError {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
                 }
             }
-            .disabled(syncing)
-            if let error = store.lastError {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-            }
-        }
-    }
 
-    private var lastSyncText: String {
-        guard let lastSyncAt = store.lastSyncAt else { return "Nunca" }
-        return Self.syncDateFormatter.string(from: lastSyncAt)
-    }
-
-    private static let syncDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_MX")
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
-    // MARK: - Seguridad
-
-    private var securitySection: some View {
-        Section("Seguridad") {
-            // Igual que la web: al activar, primero se verifica la
-            // identidad; solo si pasa se guarda el ajuste.
             Toggle("Bloquear con Face ID", isOn: Binding(
                 get: { lock.faceIDEnabled },
                 set: { newValue in
@@ -327,28 +463,7 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-        }
-    }
 
-    // MARK: - Historial y sistema
-
-    private var historySection: some View {
-        Section("Historial de versiones") {
-            NavigationLink {
-                VersionHistoryView()
-            } label: {
-                HStack {
-                    Text("Historial de versiones")
-                    Spacer()
-                    Text(AppVersion.short)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    private var systemSection: some View {
-        Section("Sistema") {
             if let email = auth.user?.email {
                 HStack {
                     Text("Correo")
@@ -357,17 +472,21 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Actualizar app")
-                Text("En esta versión, la app se actualiza desde FlareStore. Cuando haya una versión nueva, aparecerá ahí.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            Button("Cerrar sesión", role: .destructive) {
-                showingSignOutConfirm = true
-            }
         }
     }
+
+    private var lastSyncText: String {
+        guard let lastSyncAt = store.lastSyncAt else { return "Nunca" }
+        return Self.syncDateFormatter.string(from: lastSyncAt)
+    }
+
+    private static let syncDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "es_MX")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
 
     // MARK: - CSV (MAP.md §4.8: columnas Fecha, Cuenta, Tipo, Monto, Nota, Categoría)
 
@@ -527,89 +646,93 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Editar perfil
-
-private struct ProfileEditView: View {
+// MARK: - Tarjetas del inicio (Ajustes → Cuentas)
+// "Elige cuáles se ven y su color": una fila por cuenta con interruptor
+// Visible, tipo y monto, y una cuadrícula de color (como la web).
+private struct HomeCardsView: View {
     @EnvironmentObject private var store: DataStore
-    @Environment(\.dismiss) private var dismiss
-
-    private let original: UserProfile?
-    @State private var name: String
-    @State private var income: String
-    @State private var currency: String
-    @State private var errorMessage: String?
-
-    init(profile: UserProfile?) {
-        self.original = profile
-        _name = State(initialValue: profile?.name ?? "")
-        _income = State(initialValue: profile?.income ?? "fortnightly")
-        _currency = State(initialValue: profile?.currency ?? "MXN")
-    }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Mi perfil") {
-                    TextField("Nombre", text: $name)
-                        .textInputAutocapitalization(.words)
-                    Picker("Cada cuándo te pagan", selection: $income) {
-                        ForEach(ProfileIncomeOption.allCases) { option in
-                            Text(option.label).tag(option.rawValue)
+        List {
+            ForEach(store.accounts) { account in
+                Section {
+                    Toggle(isOn: hiddenBinding(for: account)) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(account.name)
+                            Text(account.isSubscription ? "Subscripción" : account.isRecurring ? "Pago recurrente" : "Cargos y abonos")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(Format.money(account.balance, currency: store.profile?.currency ?? "MXN"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    Picker("Moneda", selection: $currency) {
-                        Text("Pesos (MXN)").tag("MXN")
-                        Text("Dólares (USD)").tag("USD")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(ThemePalette.swatches) { swatch in
+                                let selected = (account.cardColor ?? "").lowercased() == swatch.hex.lowercased()
+                                Button {
+                                    Task {
+                                        try? await store.setAccountColor(account, hex: swatch.hex)
+                                    }
+                                } label: {
+                                    Circle()
+                                        .fill(Color(hex: swatch.hex))
+                                        .frame(width: 32, height: 32)
+                                        .overlay(
+                                            Circle().stroke(
+                                                selected ? Color.calculaAccent : Color.primary.opacity(0.15),
+                                                lineWidth: selected ? 3 : 1
+                                            )
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(swatch.name)
+                            }
+                            ColorPicker("Color propio", selection: colorBinding(for: account), supportsOpacity: false)
+                                .labelsHidden()
+                                .frame(width: 32, height: 32)
+                        }
+                        .padding(.vertical, 4)
                     }
-                    .pickerStyle(.segmented)
-                }
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
                 }
             }
-            .navigationTitle("Mi perfil")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") {
-                        Task { await save() }
-                    }
+        }
+        .navigationTitle("Tarjetas del inicio")
+    }
+
+    private func hiddenBinding(for account: Account) -> Binding<Bool> {
+        Binding(
+            get: {
+                store.accounts.first { $0.id == account.id }?.hiddenFromHome
+                    ?? account.hiddenFromHome
+            },
+            set: { hidden in
+                Task {
+                    try? await store.setAccountHidden(account, hidden: hidden)
                 }
             }
-        }
+        )
     }
 
-    private func save() async {
-        var profile = original ?? UserProfile()
-        profile.name = name.trimmingCharacters(in: .whitespaces)
-        profile.income = income
-        profile.currency = currency
-        do {
-            try await store.saveProfile(profile)
-            dismiss()
-        } catch {
-            errorMessage = "No se pudo guardar el perfil"
-        }
+    private func colorBinding(for account: Account) -> Binding<Color> {
+        Binding(
+            get: { Color(hex: account.cardColor ?? "111111") },
+            set: { newColor in
+                Task {
+                    try? await store.setAccountColor(
+                        account, hex: Self.hexString(from: newColor)
+                    )
+                }
+            }
+        )
     }
-}
 
-private enum ProfileIncomeOption: String, CaseIterable, Identifiable {
-    case daily, weekly, fortnightly, monthly
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .daily: return "Diario"
-        case .weekly: return "Cada semana"
-        case .fortnightly: return "Cada quincena"
-        case .monthly: return "Cada mes"
-        }
+    private static func hexString(from color: Color) -> String {
+        let uiColor = UIColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return String(format: "%02x%02x%02x", Int(r * 255), Int(g * 255), Int(b * 255))
     }
 }
 

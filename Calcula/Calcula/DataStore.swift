@@ -284,6 +284,25 @@ final class DataStore: ObservableObject {
             .updateData(["cardColor": hex])
     }
 
+    /// Actualización parcial de una cuenta (nombre, día de pago, icono,
+    /// color…): la usan "Editar tarjeta" y "Editar datos".
+    func updateAccount(id: String, patch: [String: Any]) async throws {
+        guard let uid else { return }
+        try await userCollection(uid, "accounts").document(id)
+            .updateData(patch)
+    }
+
+    /// Sincroniza el icono de la cuenta a su pago programado (como la
+    /// web: al cambiar icono/dominio en "Editar tarjeta" se actualizan
+    /// los dos documentos).
+    func updatePaymentIcon(accountId: String, slug: String, hex: String, domain: String) async throws {
+        guard let uid else { return }
+        guard let payment = scheduledPayments.first(where: { $0.accountId == accountId }),
+              let id = payment.id else { return }
+        try await userCollection(uid, "scheduledPayments").document(id)
+            .updateData(["iconSlug": slug, "iconHex": hex, "iconDomain": domain])
+    }
+
     /// Reordena las tarjetas (persiste `sortOrder` por cuenta).
     func reorderAccounts(_ ordered: [Account]) async throws {
         guard let uid else { return }

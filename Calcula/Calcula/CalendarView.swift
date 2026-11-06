@@ -12,8 +12,11 @@ struct CalendarView: View {
         let comps = Calendar.current.dateComponents([.year, .month], from: now)
         return Calendar.current.date(from: comps) ?? now
     }()
-    @State private var selectedDay: Date = Calendar.current.startOfDay(for: Date())
+    /// Día seleccionado; `nil` = ninguno (al cambiar de mes no queda
+    /// ningún día seleccionado, como la web).
+    @State private var selectedDay: Date? = Calendar.current.startOfDay(for: Date())
     @State private var category: CalendarCategory = .all
+    @State private var showBackToTop = false
 
     // MARK: - Categorías de evento (eventCategory en la web)
 
@@ -136,11 +139,13 @@ struct CalendarView: View {
     }
 
     private var selectedDayEvents: [CalendarEvent] {
-        eventsByDay[QuincenaEngine.startOfDay(selectedDay)] ?? []
+        guard let selectedDay else { return [] }
+        return eventsByDay[QuincenaEngine.startOfDay(selectedDay)] ?? []
     }
 
     private var isSelectedDayToday: Bool {
-        calendar.isDateInToday(selectedDay)
+        guard let selectedDay else { return false }
+        return calendar.isDateInToday(selectedDay)
     }
 
     /// Próximo pago programado (para mostrarlo si hoy no hay pagos).
@@ -171,8 +176,9 @@ struct CalendarView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
                     // Mes navegable + filtros (una tarjeta, como la web).
                     VStack(spacing: 12) {
                         HStack {
@@ -254,32 +260,42 @@ struct CalendarView: View {
 
                     // Pagos del día seleccionado (una tarjeta, como la web).
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Pagos del \(calendar.component(.day, from: selectedDay))")
-                            .font(.headline)
-                        if selectedDayEvents.isEmpty {
-                            if isSelectedDayToday, let nextPayment {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Sin pago en ese día.")
+                        if let selectedDay {
+                            Text("Pagos del \(calendar.component(.day, from: selectedDay))")
+                                .font(.headline)
+                            if selectedDayEvents.isEmpty {
+                                if isSelectedDayToday, let nextPayment {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Sin pago en ese día.")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                        if let nextDate = nextPayment.nextPayment {
+                                            Text("Próximo pago: \(Format.shortDate(nextDate)) · \(nextPayment.name) · \(Format.money(nextPayment.amount, currency: currency))")
+                                                .font(.subheadline)
+                                        }
+                                    }
+                                } else {
+                                    Text("No hay pagos este día")
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
-                                    if let nextDate = nextPayment.nextPayment {
-                                        Text("Próximo pago: \(Format.shortDate(nextDate)) · \(nextPayment.name) · \(Format.money(nextPayment.amount, currency: currency))")
-                                            .font(.subheadline)
-                                    }
                                 }
                             } else {
-                                Text("No hay pagos este día")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                                ForEach(selectedDayEvents) { event in
+                                    eventRow(
+                                        name: event.name,
+                                        kindLabel: event.kindLabel,
+                                        amount: event.amount
+                                    )
+                                }
                             }
                         } else {
-                            ForEach(selectedDayEvents) { event in
-                                eventRow(
-                                    name: event.name,
-                                    kindLabel: event.kindLabel,
-                                    amount: event.amount
-                                )
-                            }
+                            // Al cambiar de mes no queda ningún día
+                            // seleccionado (como la web).
+                            Text("Elige un día")
+                                .font(.headline)
+                            Text("No hay pagos este día.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
                     }
                     .padding()
@@ -287,8 +303,32 @@ struct CalendarView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 24))
                 }
                 .padding()
+                .id("calendarTop")
+                .background(
+                    GeometryReader { geometry in
+                        Color.clear.preference(
+                            key: ScrollOffsetKey.self,
+                            value: geometry.frame(in: .named("calendarScroll")).minY
+                        )
+                    }
+                )
             }
+            .coordinateSpace(name: "calendarScroll")
             .background(Color.calculaBackground)
+            .onPreferenceChange(ScrollOffsetKey.self) { minY in
+                showBackToTop = minY < -200
+            }
+            .overlay(alignment: .bottom) {
+                if showBackToTop {
+                    Button("Volver arriba") {
+                        withAnimation { proxy.scrollTo("calendarTop", anchor: .top) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.calculaAccent)
+                    .padding(.bottom, 16)
+                }
+            }
+            }
             .navigationTitle("Calendario")
         }
     }
@@ -296,7 +336,8 @@ struct CalendarView: View {
     private func changeMonth(by value: Int) {
         guard let newMonth = calendar.date(byAdding: .month, value: value, to: displayedMonth) else { return }
         displayedMonth = newMonth
-        selectedDay = calendar.date(from: calendar.dateComponents([.year, .month], from: newMonth)) ?? newMonth
+        // Al cambiar de mes no queda ningún día seleccionado (como la web).
+        selectedDay = nil
     }
 
     @ViewBuilder
@@ -306,7 +347,7 @@ struct CalendarView: View {
         let date = calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? displayedMonth
         let dayStart = QuincenaEngine.startOfDay(date)
         let events = eventsByDay[dayStart] ?? []
-        let isSelected = calendar.isDate(date, inSameDayAs: selectedDay)
+        let isSelected = selectedDay.map { calendar.isDate(date, inSameDayAs: $0) } ?? false
         let isToday = calendar.isDateInToday(date)
         let isNext = nextPaymentDay == day
         Button {
@@ -335,6 +376,12 @@ struct CalendarView: View {
                             Circle().stroke(Color.primary, lineWidth: 2)
                         }
                     }
+                // Puntos con el color de la tarjeta de la cuenta, como
+                // `accountDotColor` de la web (en las capturas de Jesus se
+                // ven rojo/azul/gris porque así son sus tarjetas:
+                // Elektra #e22400, Telmex #01c7fc, Apple #242428).
+                // Los puntos ya se filtran por el filtro activo
+                // (`eventsByDay` viene de `filteredEvents`).
                 HStack(spacing: 2) {
                     if events.count > 4 {
                         ForEach(Array(events.prefix(3)), id: \.id) { event in
@@ -378,5 +425,15 @@ struct CalendarView: View {
                 .font(.headline)
         }
         .padding(.vertical, 4)
+    }
+}
+
+/// Desplazamiento vertical del contenido del calendario (para mostrar el
+/// botón "Volver arriba" al hacer scroll; iOS 17 no tiene
+/// `onScrollGeometryChange`).
+private struct ScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }

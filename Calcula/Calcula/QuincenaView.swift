@@ -11,8 +11,9 @@ struct QuincenaScreen: View {
 
     @State private var abonarAccount: Account?
     @State private var deferPayment: ScheduledPayment?
-    @State private var payingItemId: String?
-    @State private var payError: String?
+    @State private var paymentToMark: ScheduledPayment?
+    @State private var markOccurrenceText: String?
+    @State private var showingPayroll = false
 
     private var context: QuincenaContext {
         QuincenaEngine.currentAndNext(settings: store.payroll)
@@ -79,8 +80,12 @@ struct QuincenaScreen: View {
                             QuincenaDueRow(
                                 item: item,
                                 currency: currency,
-                                isPaying: payingItemId == item.id,
-                                onPay: { Task { await pay(item) } },
+                                onPay: {
+                                    paymentToMark = item.payment
+                                    markOccurrenceText = item.occurrenceTotal > 1
+                                        ? "Pago \(item.occurrenceIndex) de \(item.occurrenceTotal)"
+                                        : nil
+                                },
                                 onAbonar: { abonarAccount = item.account },
                                 onDiferir: { deferPayment = item.payment }
                             )
@@ -112,14 +117,6 @@ struct QuincenaScreen: View {
                             .padding(.vertical, 2)
                         }
                     }
-
-                    if let payError {
-                        Section {
-                            Text(payError)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
-                        }
-                    }
                 }
                 .navigationTitle("Nómina del \(Format.date(plan.window.start))")
             } else {
@@ -131,21 +128,22 @@ struct QuincenaScreen: View {
             }
         }
         .background(Color.calculaBackground)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Nómina") { showingPayroll = true }
+            }
+        }
         .sheet(item: $abonarAccount) { account in
             AddMovementView(preselectedAccountId: account.id)
         }
         .sheet(item: $deferPayment) { payment in
             DeferStudioView(pago: payment)
         }
-    }
-
-    private func pay(_ item: QuincenaItem) async {
-        payingItemId = item.id
-        defer { payingItemId = nil }
-        do {
-            try await store.payScheduled(item.payment)
-        } catch {
-            payError = "No se pudo registrar el pago"
+        .sheet(item: $paymentToMark) { payment in
+            MarkPaymentSheet(payment: payment, occurrenceText: markOccurrenceText)
+        }
+        .sheet(isPresented: $showingPayroll) {
+            PayrollSheet()
         }
     }
 }
@@ -156,7 +154,6 @@ struct QuincenaScreen: View {
 private struct QuincenaDueRow: View {
     let item: QuincenaItem
     let currency: String
-    let isPaying: Bool
     let onPay: () -> Void
     let onAbonar: () -> Void
     let onDiferir: () -> Void
@@ -190,7 +187,7 @@ private struct QuincenaDueRow: View {
                     Button("Pagar", action: onPay)
                         .buttonStyle(.borderedProminent)
                         .tint(Color.calculaAccent)
-                        .disabled(!canPay || isPaying)
+                        .disabled(!canPay)
                     Button("Diferir", action: onDiferir)
                         .buttonStyle(.bordered)
                     if !canPay {
@@ -371,5 +368,89 @@ private struct QuincenaCompactRow: View {
                 .fontWeight(.semibold)
         }
         .font(.subheadline)
+    }
+}
+
+// MARK: - Hoja "Tu Nómina" (WEB-INVENTORY §6)
+// Días de pago de las quincenas; Guardar persiste en settings/payroll
+// (setDoc sin merge, igual que la web). Se abre desde el botón "Nómina"
+// de Inicio ("Para estar al día") y del detalle de quincena.
+struct PayrollSheet: View {
+    @EnvironmentObject private var store: DataStore
+    @Environment(\.dismiss) private var dismiss
+
+    /// 0 = último día del mes; si no, Día 16, 17, 18, 20, 25, 28 o 30.
+    @State private var payday1 = 15
+    @State private var payday2Option = 0
+    @State private var didLoad = false
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private static let secondOptions = [16, 17, 18, 20, 25, 28, 30]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Usamos tus días de pago para armar esta quincena y la siguiente.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Section("Primera quincena") {
+                    Picker("Día", selection: $payday1) {
+                        ForEach(1...15, id: \.self) { day in
+                            Text("Día \(day)").tag(day)
+                        }
+                    }
+                }
+                Section("Segunda quincena") {
+                    Picker("Día", selection: $payday2Option) {
+                        Text("Último día del mes").tag(0)
+                        ForEach(Self.secondOptions, id: \.self) { day in
+                            Text("Día \(day)").tag(day)
+                        }
+                    }
+                }
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+            }
+            .navigationTitle("Tu Nómina")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Guardar") {
+                        Task { await save() }
+                    }
+                    .disabled(isSaving)
+                }
+            }
+            .task {
+                guard !didLoad else { return }
+                didLoad = true
+                payday1 = store.payroll.payday1
+                payday2Option = store.payroll.payday2LastDay ? 0 : store.payroll.payday2
+            }
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            try await store.setPayroll(PayrollSettings(
+                payday1: payday1,
+                payday2: payday2Option == 0 ? 30 : payday2Option,
+                payday2LastDay: payday2Option == 0
+            ))
+            dismiss()
+        } catch {
+            errorMessage = "No se pudo guardar la nómina"
+        }
     }
 }

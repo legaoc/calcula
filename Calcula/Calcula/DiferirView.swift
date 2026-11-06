@@ -15,6 +15,38 @@ struct DiferirView: View {
         }
     }
 
+    private var currency: String { store.profile?.currency ?? "MXN" }
+
+    /// Dinero que se puede repartir: suma de los pagos que se pueden
+    /// diferir (vencen más allá de la quincena siguiente, MAP.md §4.5).
+    private var deferrableTotal: Double {
+        let context = QuincenaEngine.currentAndNext(settings: store.payroll)
+        return sortedPayments
+            .filter { QuincenaEngine.canDefer($0, context: context) }
+            .map(\.amount)
+            .reduce(0, +)
+    }
+
+    /// Dinero ya diferido: suma de los pagos con plan activo (split > 1).
+    private var deferredTotal: Double {
+        sortedPayments
+            .filter { $0.splitCount > 1 }
+            .map(\.amount)
+            .reduce(0, +)
+    }
+
+    /// Reparto del dinero que se puede diferir entre las próximas 5
+    /// quincenas (la actual + 4): parte igual por quincena y lo que queda
+    /// del total después de cada una ("Reparto sujeto a cambios").
+    private var leftoverRows: [(share: Double, remaining: Double)] {
+        let total = deferrableTotal
+        let parts = 5
+        let share = total / Double(parts)
+        return (0..<parts).map { index in
+            (share: share, remaining: max(0, total - share * Double(index + 1)))
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -52,6 +84,57 @@ struct DiferirView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                }
+
+                // "Reparte el dinero que te sobra" (WEB-INVENTORY §7).
+                Section("Reparte el dinero que te sobra") {
+                    HStack(spacing: 24) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Por quincena")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(Format.money(deferrableTotal, currency: currency))
+                                .font(.title3.bold())
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Diferido")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(Format.money(deferredTotal, currency: currency))
+                                .font(.title3.bold())
+                        }
+                    }
+                    .padding(.vertical, 4)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Por quincena")
+                            .font(.headline)
+                        Text("4 quincenas · Desde esta quincena")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text("Reparto sujeto a cambios")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        HStack {
+                            Text("Dinero sin asignar")
+                            Spacer()
+                            Text(Format.money(deferrableTotal, currency: currency))
+                                .fontWeight(.semibold)
+                        }
+                        .font(.subheadline)
+                        ForEach(Array(leftoverRows.enumerated()), id: \.offset) { index, row in
+                            HStack {
+                                Text("Q\(index + 1)")
+                                    .fontWeight(.semibold)
+                                Spacer()
+                                Text(Format.money(row.share, currency: currency))
+                                Text("Quedo \(Format.money(row.remaining, currency: currency))")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.subheadline)
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
             }
             .background(Color.calculaBackground)

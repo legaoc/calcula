@@ -7,6 +7,16 @@ import UIKit
 /// que guarda el perfil y crea las cuentas "Gastos" / "Ahorro" elegidas.
 struct OnboardingView: View {
     @EnvironmentObject private var store: DataStore
+    @Environment(\.dismiss) private var dismiss
+
+    /// `true` cuando se reutiliza como editor de perfil (Ajustes → Dinero
+    /// → Mi perfil): la web reusa el mismo asistente de 4 pasos con
+    /// `editingProfile=true` y un botón "Toca aquí para salir del editor".
+    let editing: Bool
+
+    init(editing: Bool = false) {
+        self.editing = editing
+    }
 
     @State private var step = 0
     @State private var name = ""
@@ -23,6 +33,12 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if editing {
+                Button("Toca aquí para salir del editor") { dismiss() }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.top)
+            }
             VStack(alignment: .leading, spacing: 8) {
                 Text("Paso \(step + 1) de 4")
                     .font(.subheadline)
@@ -55,7 +71,11 @@ struct OnboardingView: View {
             HStack(spacing: 12) {
                 if step == 0 {
                     Button("Cancelar") {
-                        Task { await finish() }
+                        if editing {
+                            dismiss()
+                        } else {
+                            Task { await finish() }
+                        }
                     }
                     .buttonStyle(.bordered)
                     .disabled(isBusy)
@@ -69,7 +89,7 @@ struct OnboardingView: View {
 
                 Spacer()
 
-                Button(isLastStep ? "Empezar" : "Siguiente") {
+                Button(isLastStep ? (editing ? "Guardar" : "Empezar") : "Siguiente") {
                     if isLastStep {
                         Task { await finish() }
                     } else {
@@ -302,6 +322,10 @@ struct OnboardingView: View {
                 colors: colors.isEmpty ? ["111111"] : colors,
                 wants: orderedWants
             )
+            // En modo editor, `finishOnboarding` guarda el perfil (y crea
+            // "Gastos"/"Ahorro" solo si faltan, como la web); aquí se cierra
+            // el editor en vez de seguir a la app.
+            if editing { dismiss() }
         } catch {
             errorMessage = "No se pudo guardar. Revisa tu conexión e inténtalo de nuevo."
         }
@@ -361,33 +385,4 @@ private enum WantOption: String, CaseIterable, Identifiable {
 }
 
 /// Paleta de 20 colores de la web (MAP.md §6: `THEME_COLORS`).
-private enum ThemePalette {
-    struct Swatch: Identifiable {
-        var id: String { hex }
-        var name: String
-        var hex: String
-    }
-
-    static let swatches: [Swatch] = [
-        .init(name: "Grafito", hex: "1a1a1e"),
-        .init(name: "Carbón", hex: "242428"),
-        .init(name: "Piedra", hex: "3f3f46"),
-        .init(name: "Azul noche", hex: "1e3a5f"),
-        .init(name: "Petróleo", hex: "164e63"),
-        .init(name: "Mar", hex: "0b3d4a"),
-        .init(name: "Bosque", hex: "0f3d2e"),
-        .init(name: "Musgo", hex: "14532d"),
-        .init(name: "Olivo", hex: "365314"),
-        .init(name: "Vino", hex: "4a1c2c"),
-        .init(name: "Cereza", hex: "7a1f1f"),
-        .init(name: "Terracota", hex: "9a3412"),
-        .init(name: "Cacao", hex: "3b2d1a"),
-        .init(name: "Café", hex: "5c4033"),
-        .init(name: "Uva", hex: "2d1b4e"),
-        .init(name: "Índigo", hex: "312e81"),
-        .init(name: "Medianoche", hex: "1e1b4b"),
-        .init(name: "Tinta", hex: "0f172a"),
-        .init(name: "Pizarra", hex: "334155"),
-        .init(name: "Malva", hex: "6b2d5b"),
-    ]
-}
+/// (Movida a Theme.swift para compartirla con "Editar tarjeta".)

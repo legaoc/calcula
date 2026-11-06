@@ -69,3 +69,36 @@ enum Format {
         return shortDayMonth.string(from: date)
     }
 }
+
+// MARK: - Paleta de 20 colores de la web (MAP.md §6: `THEME_COLORS`).
+// La usan el onboarding, el editor de perfil y "Editar tarjeta".
+enum ThemePalette {
+    struct Swatch: Identifiable {
+        var id: String { hex }
+        var name: String
+        var hex: String
+    }
+
+    static let swatches: [Swatch] = [
+        .init(name: "Grafito", hex: "1a1a1e"),
+        .init(name: "Carbón", hex: "242428"),
+        .init(name: "Piedra", hex: "3f3f46"),
+        .init(name: "Azul noche", hex: "1e3a5f"),
+        .init(name: "Petróleo", hex: "164e63"),
+        .init(name: "Mar", hex: "0b3d4a"),
+        .init(name: "Bosque", hex: "0f3d2e"),
+        .init(name: "Musgo", hex: "14532d"),
+        .init(name: "Olivo", hex: "365314"),
+        .init(name: "Vino", hex: "4a1c2c"),
+        .init(name: "Cereza", hex: "7a1f1f"),
+        .init(name: "Terracota", hex: "9a3412"),
+        .init(name: "Cacao", hex: "3b2d1a"),
+        .init(name: "Café", hex: "5c4033"),
+        .init(name: "Uva", hex: "2d1b4e"),
+        .init(name: "Índigo", hex: "312e81"),
+        .init(name: "Medianoche", hex: "1e1b4b"),
+        .init(name: "Tinta", hex: "0f172a"),
+        .init(name: "Pizarra", hex: "334155"),
+        .init(name: "Malva", hex: "6b2d5b"),
+    ]
+}
