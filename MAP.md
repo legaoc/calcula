@@ -659,3 +659,29 @@ Verificado: cero patrones que fallaban (grep), llaves y paréntesis
 balanceados en los 6 archivos editados, otros ShareLink del proyecto
 (String y URL) no afectados. Sin compilador Swift en Linux: la prueba
 real es el siguiente run de GitHub Actions.
+
+## 16. FIX DE COMPILACIÓN: 2 ERRORES SWIFT DEL RUN #13 (6 nov 2026)
+
+El run #13 falló con exit code 65 (4m 38s). Ya no salen los errores
+anteriores (§14 y §15, arreglados). Quedaban estos 2:
+
+1. **GoalsView.swift:164** — `DataRepresentation(contentType: .png) { ... }`
+   da "missing argument for parameter 'importing' in call": ese
+   inicializador es para IMPORTAR. Para compartir con ShareLink se
+   EXPORTA, y el inicializador correcto es
+   `DataRepresentation(exportedContentType: .png) { $0.image.pngData() ?? Data() }`.
+   Corregido en el `ShareableImage` (struct privado, líneas 160-166).
+   El botón sigue compartiendo la imagen de la meta igual que antes.
+2. **HomeView.swift:143:37** — "the compiler is unable to type-check
+   this expression in reasonable time": la sección de movimientos
+   recientes del `body` de Inicio (`LazyVStack` con `ForEach(recentMovements)`,
+   `MovementRow` con `.contextMenu` de "Ver cuenta"/"Eliminar" y el
+   `Divider` condicional). Extraída a la subvista privada
+   `RecentMovementsSection` (movimientos, cuentas, moneda y cierres
+   `onViewAccount`/`onDelete`); el `body` quedó más ligero. Mismo
+   aspecto y comportamiento. El `accountName(for:)` de HomeView, que
+   solo se usaba ahí, se movió dentro de la subvista.
+
+Verificado: cero patrones que fallaban (grep), llaves, paréntesis y
+corchetes balanceados en los 2 archivos editados. Sin compilador Swift
+en Linux: la prueba real es el siguiente run de GitHub Actions.
