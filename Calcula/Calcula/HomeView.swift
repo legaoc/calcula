@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var movementToDelete: Movement?
     @State private var paymentToPay: ScheduledPayment?
     @State private var showingAccounts = false
+    @State private var showingSearch = false
     @State private var hapticTrigger = 0
 
     var body: some View {
@@ -141,12 +142,20 @@ struct HomeView: View {
             .navigationTitle("Inicio")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showingSearch = true } label: {
+                        Image(systemName: "magnifyingglass")
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink {
                         SettingsView()
                     } label: {
                         Image(systemName: "gearshape")
                     }
                 }
+            }
+            .sheet(isPresented: $showingSearch) {
+                SearchView()
             }
             .navigationDestination(item: $selectedAccount) { account in
                 AccountDetailView(account: account)

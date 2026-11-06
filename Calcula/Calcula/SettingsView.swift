@@ -638,14 +638,14 @@ private struct ReorderAccountsView: View {
                 }
             }
             .onMove(perform: move)
-            Text("Arrastra las tarjetas para cambiar el orden en el inicio.")
+            Text("Arrastra las tarjetas con el dedo para cambiar el orden en el inicio.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
+        // Modo de edición siempre activo: se arrastra directo, sin tocar
+        // "Editar" (el orden se guarda en Firestore al mover, como antes).
+        .environment(\.editMode, .constant(.active))
         .navigationTitle("Orden de tarjetas")
-        .toolbar {
-            EditButton()
-        }
         .task {
             ordered = store.accounts
         }

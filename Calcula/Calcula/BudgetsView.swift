@@ -136,6 +136,44 @@ struct BudgetRow: View {
     }
 }
 
+// MARK: - Detalle de presupuesto (destino de la búsqueda global)
+
+/// Las tarjetas de presupuesto no tenían pantalla de detalle en la app;
+/// esta es mínima: la misma fila de la lista y eliminar.
+struct BudgetDetailView: View {
+    @EnvironmentObject private var store: DataStore
+    @Environment(\.dismiss) private var dismiss
+
+    let budget: Budget
+
+    @State private var showingDeleteConfirm = false
+
+    var body: some View {
+        List {
+            Section {
+                BudgetRow(budget: budget)
+            }
+            Section {
+                Button("Eliminar presupuesto", role: .destructive) {
+                    showingDeleteConfirm = true
+                }
+            }
+        }
+        .navigationTitle(budget.name)
+        .alert("Eliminar presupuesto", isPresented: $showingDeleteConfirm) {
+            Button("Eliminar", role: .destructive) {
+                Task {
+                    try? await store.deleteBudget(budget)
+                    dismiss()
+                }
+            }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Se borrará el presupuesto.")
+        }
+    }
+}
+
 // MARK: - Formulario de alta de presupuesto
 
 struct BudgetFormView: View {
