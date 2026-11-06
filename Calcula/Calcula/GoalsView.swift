@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Metas de ahorro (MAP.md §1.5 y §4.7)
 //
@@ -154,6 +155,16 @@ struct GoalRow: View {
 
 // MARK: - Detalle de meta
 
+/// Envoltorio para compartir un UIImage con ShareLink: UIImage no es
+/// Transferable, así que se exporta como PNG.
+private struct ShareableImage: Transferable {
+    let image: UIImage
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(contentType: .png) { $0.image.pngData() ?? Data() }
+    }
+}
+
 struct GoalDetailView: View {
     @EnvironmentObject private var store: DataStore
 
@@ -221,7 +232,10 @@ struct GoalDetailView: View {
                             .frame(maxWidth: .infinity)
 
                         if let image = shareImage {
-                            ShareLink(item: image, preview: SharePreview(goal.name))
+                            ShareLink(
+                                item: ShareableImage(image: image),
+                                preview: SharePreview(goal.name, image: Image(uiImage: image))
+                            )
                                 .buttonStyle(.bordered)
                                 .frame(maxWidth: .infinity)
                         } else {

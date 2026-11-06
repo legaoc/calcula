@@ -68,14 +68,10 @@ struct HomeView: View {
                             Text("Por pagar")
                                 .font(.headline)
                             ForEach(Array(upcomingReminders.prefix(3))) { item in
-                                HStack {
-                                    Text(item.name)
-                                        .lineLimit(1)
-                                    Spacer()
-                                    Text("\(relativeDay(item.date)) · \(Format.money(item.amount, currency: currency))")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
+                                DueReminderRow(
+                                    title: item.name,
+                                    detail: "\(relativeDay(item.date)) · \(Format.money(item.amount, currency: currency))"
+                                )
                             }
                         }
                         .padding()
@@ -309,6 +305,24 @@ private struct ReminderItem: Identifiable {
     var name: String
     var date: Date
     var amount: Double
+}
+
+/// Fila del banner "Por pagar" (extraída del body de Inicio para que el
+/// compilador verifique el tipo en tiempo razonable).
+private struct DueReminderRow: View {
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .lineLimit(1)
+            Spacer()
+            Text(detail)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
 }
 
 /// Tarjeta de cuenta (color guardado en `cardColor`, como la web).

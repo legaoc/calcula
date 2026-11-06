@@ -210,7 +210,7 @@ struct OnboardingView: View {
                 Spacer()
                 if selected {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.calculaAccent)
+                        .foregroundStyle(Color.calculaAccent)
                 }
             }
             .padding()

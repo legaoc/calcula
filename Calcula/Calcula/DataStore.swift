@@ -34,7 +34,7 @@ final class DataStore: ObservableObject {
     private var remindersListener: ListenerRegistration?
     private var financeListener: ListenerRegistration?
     private var profileListener: ListenerRegistration?
-    private var syncDeregister: (() -> Void)?
+    private var syncDeregister: ListenerRegistration?
     private var uid: String?
 
     /// Total pendiente del inicio (igual que la web): suma de max(0, balance)
@@ -179,7 +179,7 @@ final class DataStore: ObservableObject {
         remindersListener?.remove()
         financeListener?.remove()
         profileListener?.remove()
-        syncDeregister?()
+        syncDeregister?.remove()
         accountsListener = nil
         movementsListener = nil
         accountMovementsListener = nil

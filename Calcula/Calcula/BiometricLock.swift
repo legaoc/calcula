@@ -61,7 +61,7 @@ struct LockView: View {
             Spacer()
             Image(systemName: "lock.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(.calculaAccent)
+                .foregroundStyle(Color.calculaAccent)
             Text("Calcula")
                 .font(.largeTitle.bold())
             Text("Tu información está bloqueada")
