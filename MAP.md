@@ -964,3 +964,50 @@ documentan aquí (no se tocaron). Referencia: el código real de la web
     CHANGELOG.md con la entrada de la 1.2.1 (2026-11-06). Sin archivos
     nuevos: todas las vistas nuevas viven en archivos existentes (no
     hay que registrar nada en el pbxproj).
+
+## 20. VERSIÓN 1.2.2: LOGO REAL DE CALCULA EN EL ENCABEZADO Y EN EL ÍCONO DE LA APP (6 nov 2026)
+
+Pedido de Jesus tras probar la 1.2.1: la esquina superior izquierda de
+Inicio decía "Inicio" y el ícono de la app no cargaba (se veía una "C"
+dorada, placeholder del coordinador anterior; ese dorado es de otro
+proyecto, no es de Calcula).
+
+1. **Wordmark en el encabezado de Inicio** (`HomeView.swift:175-186`) —
+   Se quitó `.navigationTitle("Inicio")` y se puso
+   `.navigationBarTitleDisplayMode(.inline)` con un
+   `ToolbarItem(placement: .navigationBarLeading)` que muestra el
+   wordmark "Calcula" de la web (alto 28pt), con los botones de buscar
+   y ajustes a la derecha como antes.
+2. **Los PNG de la web** (`~/workspace/psnlgastos-app/www/`, COPIADOS,
+   no movidos; los originales siguen ahí) — Dos assets nuevos en
+   `Calcula/Calcula/Assets.xcassets/`:
+   - `CalculaWordmark.imageset` ← `calcula-wordmark.png` (225×96, RGBA).
+   - `CalculaWordmarkLarge.imageset` ← `calcula-logo.png` (1100×454, RGBA).
+   Los .xcassets ya están referenciados: no hizo falta tocar el pbxproj
+   para los assets.
+3. **Claro y oscuro** — CORRECCIÓN a lo que decía la tarea: los dos PNG
+   de la web son CLAROS sobre transparente (verificado por píxel:
+   `calcula-wordmark.png` tiene brillo 211–255, mediana 228, cero
+   píxeles oscuros; `calcula-logo.png` es blanco puro). No hay un
+   wordmark negro en la web. Por eso el wordmark se muestra con
+   `.renderingMode(.template)` + `.foregroundStyle(.primary)`: la alfa
+   del PNG se usa como máscara y se tiñe de negro en modo claro y de
+   blanco en modo oscuro. NO se dejó fijo en negro (en oscuro no se
+   vería). El pequeño (`CalculaWordmark`) va en la barra de Inicio; el
+   grande (`CalculaWordmarkLarge`) en acceso y onboarding.
+4. **Ícono de la app** — `Assets.xcassets/AppIcon.appiconset/icon-1024.png`
+   reemplazado por el ícono real `icon-512.png` de la web (la "C"
+   ornamentada en gris claro sobre negro), escalado a 1024×1024 con PIL
+   Lanczos. Verificado: 1024×1024 RGB. El Contents.json del appiconset
+   ya referenciaba solo icon-1024.png 1024×1024 y no se tocó. El dorado
+   (`calculaGold` en Theme.swift) no se usa en ninguna pantalla; solo
+   estaba en el placeholder del ícono.
+5. **Acceso y onboarding** — `LoginView.swift`: el `Text("Calcula")`
+   en negrita 44pt se reemplazó por el wordmark grande (alto 44pt,
+   template + primary); el subtítulo "Tus gastos, en orden" queda
+   igual. `OnboardingView.swift`: no tenía logo; ahora lleva el
+   wordmark grande arriba (alto 24pt, template + primary), también en
+   modo edición de perfil.
+6. **Versión** — MARKETING_VERSION 1.2.2 y CURRENT_PROJECT_VERSION 5
+   (Debug y Release, pbxproj + Info.plist). CHANGELOG.md con la entrada
+   de la 1.2.2 (2026-11-06).

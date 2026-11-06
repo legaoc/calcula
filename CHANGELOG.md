@@ -3,6 +3,11 @@
 La app muestra este historial en Ajustes → Historial de versiones.
 La versión actual también se ve en Ajustes, abajo del todo.
 
+## 1.2.2 — 2026-11-06 — Logo real de Calcula en el encabezado y en el ícono de la app
+- Inicio: el encabezado ya no dice "Inicio"; muestra el wordmark "Calcula" de la web arriba a la izquierda, junto a los botones de buscar y ajustes. Se ve bien en claro y en oscuro (se tiñe con el color del sistema).
+- Ícono de la app: ya no es la "C" dorada; ahora es el ícono real de Calcula (la "C" ornamentada en gris claro sobre negro).
+- Acceso y onboarding: la pantalla de acceso muestra el wordmark "Calcula" en lugar del texto, y el asistente de 4 pasos también lo lleva arriba.
+
 ## 1.2.1 — 2026-11-06 — Huecos del inventario de la web (inicio, cuenta, calendario, ajustes)
 - Inicio: "Próximos pagos" con flecha ↗ (o "!" roja si está vencido), nombre, cuenta, fecha ("En 2 días · 8 nov 2026"), monto y botón "Pagar" por fila; aviso ámbar "Por pagar" con una línea por pago ("En 2 días · Pago semanal · $216.00").
 - Hoja "Marcar pago": monto, "Programado para 8 nov 2026" y botones "Cancelar" / "Marcar como pagado" (crea el movimiento y avanza el próximo pago, como la web).
