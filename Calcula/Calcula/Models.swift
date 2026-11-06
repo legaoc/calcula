@@ -7,7 +7,7 @@ import FirebaseFirestore
 // web pero no siempre están presentes en todos los documentos.
 
 /// Cuenta: users/{uid}/accounts/{id}
-struct Account: Identifiable, Codable, Equatable {
+struct Account: Identifiable, Codable, Equatable, Hashable {
     @DocumentID var id: String?
     var name: String = ""
     /// "charges" (cargos / tarjetas) o "recurring" (pagos recurrentes).
