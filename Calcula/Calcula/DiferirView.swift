@@ -20,9 +20,12 @@ struct DiferirView: View {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
+                        Text("Diferir")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
                         Text("Reparte un pago")
-                            .font(.title2.bold())
-                        Text("Divide un pago grande en partes iguales entre varias quincenas, semanas o meses, para que no te pegue de golpe en una sola nómina.")
+                            .font(.largeTitle.bold())
+                        Text("Elige un pago que ya tienes, o una cantidad, y júntalo en semanas, quincenas o meses.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Button("Diferir una cantidad") {
@@ -30,14 +33,15 @@ struct DiferirView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(Color.calculaAccent)
+                        .frame(maxWidth: .infinity)
                         .padding(.top, 4)
                     }
                     .padding(.vertical, 4)
                 }
 
-                Section("Pagos programados") {
+                Section("¿Qué pago quieres diferir?") {
                     if sortedPayments.isEmpty {
-                        Text("Aún no tienes pagos programados.")
+                        Text("Todavía no hay pagos. Puedes diferir una cantidad.")
                             .foregroundStyle(.secondary)
                     }
                     ForEach(sortedPayments) { payment in
@@ -87,7 +91,7 @@ struct DiferirView: View {
             }
             HStack(spacing: 6) {
                 if let next = payment.nextPayment {
-                    Text(Format.date(next))
+                    Text(Format.shortDate(next))
                 }
                 if let accountName {
                     Text("·")

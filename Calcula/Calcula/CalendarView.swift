@@ -79,7 +79,7 @@ struct CalendarView: View {
                     id: "\(payment.id ?? "")-\(date.timeIntervalSince1970)",
                     date: date,
                     name: payment.name,
-                    kindLabel: payment.isSubscription ? "Suscripción" : "Pago recurrente",
+                    kindLabel: kindLabel(for: category),
                     amount: payment.amount,
                     hex: hex,
                     category: category
@@ -148,62 +148,88 @@ struct CalendarView: View {
         store.scheduledPayments.first { $0.nextPayment != nil }
     }
 
+    /// Día del próximo pago dentro del mes visible (la web lo marca con
+    /// un anillo, `is-next`): el primer pago programado, si cae este mes.
+    private var nextPaymentDay: Int? {
+        guard let next = store.scheduledPayments.compactMap(\.nextPayment).min() else { return nil }
+        let comps = calendar.dateComponents([.year, .month, .day], from: next)
+        let monthComps = calendar.dateComponents([.year, .month], from: displayedMonth)
+        guard comps.year == monthComps.year, comps.month == monthComps.month else { return nil }
+        return comps.day
+    }
+
+    /// Etiqueta de la fila de pagos, como la web: "Subscripción" /
+    /// "Pago semanal" / "Cargo" ("Pago recurrente" para el resto).
+    private func kindLabel(for category: CalendarCategory) -> String {
+        switch category {
+        case .subs: return "Subscripción"
+        case .weekly: return "Pago semanal"
+        case .charges: return "Cargo"
+        case .all: return "Pago recurrente"
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Mes navegable
-                    HStack {
-                        Button {
-                            changeMonth(by: -1)
-                        } label: {
-                            Image(systemName: "chevron.left")
-                                .font(.headline)
-                                .padding(8)
+                    // Mes navegable + filtros (una tarjeta, como la web).
+                    VStack(spacing: 12) {
+                        HStack {
+                            Button {
+                                changeMonth(by: -1)
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.headline)
+                                    .padding(8)
+                            }
+                            Spacer()
+                            Text(monthTitle)
+                                .font(.title3.bold())
+                            Spacer()
+                            Button {
+                                changeMonth(by: 1)
+                            } label: {
+                                Image(systemName: "chevron.right")
+                                    .font(.headline)
+                                    .padding(8)
+                            }
                         }
-                        Spacer()
-                        Text(monthTitle)
-                            .font(.title3.bold())
-                        Spacer()
-                        Button {
-                            changeMonth(by: 1)
-                        } label: {
-                            Image(systemName: "chevron.right")
-                                .font(.headline)
-                                .padding(8)
-                        }
-                    }
 
-                    // Filtros con contador
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(CalendarCategory.allCases) { option in
-                                Button {
-                                    category = option
-                                } label: {
-                                    Text("\(option.label) (\(count(for: option)))")
-                                        .font(.subheadline.bold())
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            category == option
-                                                ? Color.calculaAccent
-                                                : Color.calculaCard
-                                        )
-                                        .foregroundStyle(
-                                            category == option ? .white : .primary
-                                        )
-                                        .clipShape(Capsule())
+                        // Filtros con contador ("Todas 6", como la web).
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(CalendarCategory.allCases) { option in
+                                    Button {
+                                        category = option
+                                    } label: {
+                                        Text("\(option.label) \(count(for: option))")
+                                            .font(.subheadline.bold())
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 8)
+                                            .background(
+                                                category == option
+                                                    ? Color.calculaAccent
+                                                    : Color(.tertiarySystemFill)
+                                            )
+                                            .foregroundStyle(
+                                                category == option ? .white : .primary
+                                            )
+                                            .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
+                    .padding()
+                    .background(Color.calculaCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
 
-                    // Rejilla L–D (lunes primero)
+                    // Rejilla L–D (lunes primero), en su propia tarjeta.
                     VStack(spacing: 8) {
                         HStack {
-                            ForEach(["L", "M", "X", "J", "V", "S", "D"], id: \.self) { letter in
+                            ForEach(["L", "M", "M", "J", "V", "S", "D"], id: \.self) { letter in
                                 Text(letter)
                                     .font(.caption.bold())
                                     .foregroundStyle(.secondary)
@@ -222,23 +248,24 @@ struct CalendarView: View {
                             }
                         }
                     }
+                    .padding()
+                    .background(Color.calculaCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
 
-                    // Pagos del día seleccionado
+                    // Pagos del día seleccionado (una tarjeta, como la web).
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Pagos del \(Format.date(selectedDay))")
+                        Text("Pagos del \(calendar.component(.day, from: selectedDay))")
                             .font(.headline)
                         if selectedDayEvents.isEmpty {
                             if isSelectedDayToday, let nextPayment {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("Hoy no hay pagos. El próximo es:")
+                                    Text("Sin pago en ese día.")
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
-                                    eventRow(
-                                        name: nextPayment.name,
-                                        kindLabel: nextPayment.isSubscription ? "Suscripción" : "Pago recurrente",
-                                        amount: nextPayment.amount,
-                                        date: nextPayment.nextPayment
-                                    )
+                                    if let nextDate = nextPayment.nextPayment {
+                                        Text("Próximo pago: \(Format.shortDate(nextDate)) · \(nextPayment.name) · \(Format.money(nextPayment.amount, currency: currency))")
+                                            .font(.subheadline)
+                                    }
                                 }
                             } else {
                                 Text("No hay pagos este día")
@@ -250,12 +277,14 @@ struct CalendarView: View {
                                 eventRow(
                                     name: event.name,
                                     kindLabel: event.kindLabel,
-                                    amount: event.amount,
-                                    date: event.date
+                                    amount: event.amount
                                 )
                             }
                         }
                     }
+                    .padding()
+                    .background(Color.calculaCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
                 }
                 .padding()
             }
@@ -279,17 +308,33 @@ struct CalendarView: View {
         let events = eventsByDay[dayStart] ?? []
         let isSelected = calendar.isDate(date, inSameDayAs: selectedDay)
         let isToday = calendar.isDateInToday(date)
+        let isNext = nextPaymentDay == day
         Button {
             selectedDay = dayStart
         } label: {
             VStack(spacing: 4) {
                 Text("\(day)")
                     .font(.subheadline)
-                    .fontWeight(isToday ? .bold : .regular)
-                    .foregroundStyle(isSelected ? .white : (isToday ? Color.calculaAccent : .primary))
+                    .fontWeight(isToday || isSelected ? .bold : .regular)
+                    // Día seleccionado: relleno del sistema con texto
+                    // invertido, visible en modo claro y oscuro (la web
+                    // hace lo mismo: claro en oscuro, oscuro en claro).
+                    .foregroundStyle(isSelected ? Color(.systemBackground) : .primary)
                     .frame(width: 30, height: 30)
-                    .background(isSelected ? Color.calculaAccent : Color.clear)
+                    .background(
+                        isSelected
+                            ? Color.primary
+                            : isToday
+                                ? Color.primary.opacity(0.1)
+                                : Color.clear
+                    )
                     .clipShape(Circle())
+                    // Día del próximo pago: anillo, como `is-next` de la web.
+                    .overlay {
+                        if isNext && !isSelected {
+                            Circle().stroke(Color.primary, lineWidth: 2)
+                        }
+                    }
                 HStack(spacing: 2) {
                     if events.count > 4 {
                         ForEach(Array(events.prefix(3)), id: \.id) { event in
@@ -316,21 +361,17 @@ struct CalendarView: View {
         .buttonStyle(.plain)
     }
 
+    /// Fila de pago del día: nombre + tipo y monto (la fecha va en el
+    /// título "Pagos del N", como la web).
     @ViewBuilder
-    private func eventRow(name: String, kindLabel: String, amount: Double, date: Date?) -> some View {
+    private func eventRow(name: String, kindLabel: String, amount: Double) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
                     .font(.headline)
-                HStack(spacing: 6) {
-                    Text(kindLabel)
-                    if let date {
-                        Text("·")
-                        Text(Format.date(date))
-                    }
-                }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                Text(kindLabel)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             Text(Format.money(amount, currency: currency))

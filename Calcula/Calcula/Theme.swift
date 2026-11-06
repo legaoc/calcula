@@ -53,4 +53,19 @@ enum Format {
         guard let date else { return "" }
         return dayMonth.string(from: date)
     }
+
+    /// Fecha corta sin año ("30 sep", "15 dic"), como `formatShortDate`
+    /// de la web. La usan las tarjetas de cuenta, quincena, diferir y
+    /// el detalle de meta.
+    static let shortDayMonth: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "es_MX")
+        f.dateFormat = "d MMM"
+        return f
+    }()
+
+    static func shortDate(_ date: Date?) -> String {
+        guard let date else { return "" }
+        return shortDayMonth.string(from: date)
+    }
 }

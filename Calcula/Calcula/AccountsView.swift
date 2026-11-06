@@ -15,7 +15,7 @@ struct AccountsView: View {
                     HStack {
                         VStack(alignment: .leading) {
                             Text(account.name)
-                            Text(account.isRecurring ? "Recurrente" : "Cargos")
+                            Text(account.isSubscription ? "Subscripción" : account.isRecurring ? "Pago recurrente" : "Cargos y abonos")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -98,7 +98,7 @@ struct AccountDetailView: View {
                 HStack {
                     Text("Tipo")
                     Spacer()
-                    Text(liveAccount.isRecurring ? "Recurrente" : "Cargos")
+                    Text(liveAccount.isSubscription ? "Subscripción" : liveAccount.isRecurring ? "Pago recurrente" : "Cargos y abonos")
                         .foregroundStyle(.secondary)
                 }
                 if liveAccount.dueDay > 0 {

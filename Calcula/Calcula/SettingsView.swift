@@ -89,7 +89,7 @@ struct SettingsView: View {
                     Toggle(isOn: hiddenBinding(for: account)) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(account.name)
-                            Text(account.isRecurring ? "Recurrente" : "Cargos")
+                            Text(account.isSubscription ? "Subscripción" : account.isRecurring ? "Pago recurrente" : "Cargos y abonos")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -625,7 +625,7 @@ private struct ReorderAccountsView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(account.name)
-                        Text(account.isRecurring ? "Recurrente" : "Cargos")
+                        Text(account.isSubscription ? "Subscripción" : account.isRecurring ? "Pago recurrente" : "Cargos y abonos")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

@@ -47,12 +47,16 @@ struct FinanceView: View {
         }
     }
 
+    /// "Nuevo gasto vs el año pasado" / "X% más que…" / "Sin cambios vs…",
+    /// como `renderFinance` de la web.
     private var deltaText: String {
         if previousSpend == 0 {
-            return currentSpend > 0 ? "Nuevo gasto" : "Sin cambios"
+            return currentSpend > 0
+                ? "Nuevo gasto vs \(previousPeriodLabel)"
+                : "Sin cambios vs \(previousPeriodLabel)"
         }
         let pct = (currentSpend - previousSpend) / previousSpend * 100
-        if abs(pct) < 0.5 { return "Sin cambios" }
+        if abs(pct) < 0.5 { return "Sin cambios vs \(previousPeriodLabel)" }
         let formatted = String(format: "%.0f%%", abs(pct))
         return pct > 0
             ? "\(formatted) más que \(previousPeriodLabel)"
@@ -90,13 +94,6 @@ struct FinanceView: View {
 
     private var heroCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("Periodo", selection: $period) {
-                ForEach(FinancePeriod.allCases, id: \.self) { period in
-                    Text(period.label).tag(period)
-                }
-            }
-            .pickerStyle(.segmented)
-
             Text("Gastado \(heroPeriodLabel)")
                 .font(.headline)
                 .foregroundStyle(.secondary)
@@ -108,6 +105,16 @@ struct FinanceView: View {
             Text(deltaText)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(deltaColor)
+
+            // Selector de periodo al final de la tarjeta, como la web;
+            // el control segmentado es el patrón nativo de iOS.
+            Picker("Periodo", selection: $period) {
+                ForEach(FinancePeriod.allCases, id: \.self) { period in
+                    Text(period.label).tag(period)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.top, 6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
@@ -119,7 +126,7 @@ struct FinanceView: View {
 
     private var chartCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Gastos por \(period.label.lowercased())")
+            Text("Comparativa")
                 .font(.headline)
 
             let buckets = FinanceCalc.buckets(for: period, movements: store.financeMovements)
@@ -148,6 +155,15 @@ struct FinanceView: View {
                     }
                 }
                 .frame(height: 132)
+
+                // Leyenda con el mínimo y el máximo, como la web.
+                HStack {
+                    Text(Format.money(0, currency: currency))
+                    Spacer()
+                    Text(Format.money(max(maxAmount, 1), currency: currency))
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
         }
         .padding(20)
@@ -159,18 +175,11 @@ struct FinanceView: View {
 
     private var budgetsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Presupuestos del mes")
-                    .font(.title3.bold())
-                Spacer()
-                Button("Nuevo presupuesto") {
-                    showingNewBudget = true
-                }
-                .font(.subheadline.weight(.semibold))
-            }
+            Text("Presupuestos del mes")
+                .font(.title3.bold())
 
             if store.budgets.isEmpty {
-                Text("Aún no tienes presupuestos. Crea uno para seguir tu gasto por categoría.")
+                Text("Aún no tienes un tope del mes.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(16)
@@ -184,6 +193,12 @@ struct FinanceView: View {
                     }
                 }
             }
+
+            Button("Nuevo presupuesto") {
+                showingNewBudget = true
+            }
+            .buttonStyle(.bordered)
+            .frame(maxWidth: .infinity)
         }
     }
 

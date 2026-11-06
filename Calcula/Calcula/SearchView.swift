@@ -169,7 +169,7 @@ struct SearchView: View {
             NavigationLink(value: SearchDestination.account(id: account.id ?? "")) {
                 SearchRow(
                     title: account.name,
-                    subtitle: account.isRecurring ? "Recurrente" : "Cargos",
+                    subtitle: account.isSubscription ? "Subscripción" : account.isRecurring ? "Pago recurrente" : "Cargos y abonos",
                     trailing: Format.money(account.balance, currency: currency)
                 )
             }

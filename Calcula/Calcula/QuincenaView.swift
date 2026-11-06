@@ -211,9 +211,12 @@ private struct QuincenaDueRow: View {
 }
 
 // MARK: - Tarjeta compacta de quincena (Inicio, MAP.md §3.2)
-// "Nómina del {fecha}", "Cubre {rango}", "{fromPayroll} de tu nómina",
-// "Pagar ahora {toPay}" / "Apartar {toSetAside}" y lista compacta de
-// ítems (nombre + share). La tarjeta "Esta quincena" es oscura.
+// Mismo contenido que `renderQuincenaCard` de la web: "Esta quincena" /
+// "Nómina del {fecha corta}" / "Cubre {rango corto}", cantidad grande
+// con "de tu nómina", las dos acciones "Pagar ahora" y "Apartar" con
+// sus cantidades, y la lista compacta de ítems (con insignia Pagar /
+// Vencido / Apartar N/M) o el mensaje "No te toca pagar ni apartar
+// nada aquí." cuando no hay nada. Presentación nativa de iOS.
 
 struct QuincenaCard: View {
     @EnvironmentObject private var store: DataStore
@@ -234,46 +237,62 @@ struct QuincenaCard: View {
     private var isCurrent: Bool { windowIndex == context.currentIndex }
     private var currency: String { store.profile?.currency ?? "MXN" }
 
-    var body: some View {
+    /// Fondo de las cajas internas: claro translúcido sobre la tarjeta
+    /// oscura ("Esta quincena") y relleno del sistema sobre la clara.
+    private var innerBackground: Color {
+        isCurrent ? Color.white.opacity(0.08) : Color(.tertiarySystemFill)
+    }
+
+    private var body: some View {
         Group {
             if let plan {
                 NavigationLink {
                     QuincenaScreen(windowIndex: windowIndex)
                 } label: {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(isCurrent ? "Esta quincena" : "Siguiente quincena")
-                                .font(.caption.bold())
-                                .foregroundStyle(isCurrent ? .white.opacity(0.7) : .secondary)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(isCurrent ? "Esta quincena" : "Siguiente quincena")
+                                    .font(.caption.bold())
+                                    .foregroundStyle(isCurrent ? .white.opacity(0.7) : .secondary)
+                                Text("Nómina del \(Format.shortDate(plan.window.start))")
+                                    .font(.headline)
+                                Text("Cubre \(Format.shortDate(plan.window.start)) – \(Format.shortDate(plan.window.end))")
+                                    .font(.subheadline)
+                                    .foregroundStyle(isCurrent ? .white.opacity(0.8) : .secondary)
+                            }
                             Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.bold())
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text(Format.money(plan.fromPayroll, currency: currency))
+                                    .font(.system(size: 32, weight: .bold))
+                                Text("de tu nómina")
+                                    .font(.caption)
+                                    .foregroundStyle(isCurrent ? .white.opacity(0.7) : .secondary)
+                            }
+                        }
+
+                        HStack(spacing: 8) {
+                            splitBox(label: "Pagar ahora", amount: plan.toPay)
+                            splitBox(label: "Apartar", amount: plan.toSetAside)
+                        }
+
+                        if plan.items.isEmpty {
+                            Text("No te toca pagar ni apartar nada aquí.")
+                                .font(.subheadline)
                                 .foregroundStyle(isCurrent ? .white.opacity(0.7) : .secondary)
-                        }
-                        Text("Nómina del \(Format.date(plan.window.start))")
-                            .font(.headline)
-                        Text("Cubre \(Format.date(plan.window.start)) – \(Format.date(plan.window.end))")
-                            .font(.subheadline)
-                            .foregroundStyle(isCurrent ? .white.opacity(0.8) : .secondary)
-                        Text("\(Format.money(plan.fromPayroll, currency: currency)) de tu nómina")
-                            .font(.subheadline)
-                        if plan.toPay > 0 {
-                            Text("Pagar ahora \(Format.money(plan.toPay, currency: currency))")
-                                .font(.subheadline.bold())
-                        }
-                        if plan.toSetAside > 0 {
-                            Text("Apartar \(Format.money(plan.toSetAside, currency: currency))")
-                                .font(.subheadline)
-                        }
-                        if !plan.items.isEmpty {
-                            Divider()
-                            ForEach(plan.items) { item in
-                                HStack {
-                                    Text(item.payment.name)
-                                    Spacer()
-                                    Text(Format.money(item.share, currency: currency))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(innerBackground)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        } else {
+                            VStack(spacing: 8) {
+                                ForEach(plan.items) { item in
+                                    QuincenaCompactRow(
+                                        item: item,
+                                        currency: currency,
+                                        isCurrent: isCurrent
+                                    )
                                 }
-                                .font(.subheadline)
                             }
                         }
                     }
@@ -286,5 +305,71 @@ struct QuincenaCard: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private func splitBox(label: String, amount: Double) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(isCurrent ? .white.opacity(0.7) : .secondary)
+            Text(Format.money(amount, currency: currency))
+                .font(.headline)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(innerBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+}
+
+/// Fila compacta de un ítem de quincena: insignia (Pagar / Vencido /
+/// Apartar N/M), nombre, cuenta y parte de esta quincena, como
+/// `renderQuincenaItems` de la web.
+private struct QuincenaCompactRow: View {
+    let item: QuincenaItem
+    let currency: String
+    let isCurrent: Bool
+
+    private var badgeText: String {
+        if item.isDue {
+            return item.overdue ? "Vencido" : "Pagar"
+        }
+        return "Apartar \(item.installment)/\(item.split)"
+    }
+
+    /// "1 pago de $X" / "N pagos de $X", como `paymentsLabel` de la web.
+    private var multiLabel: String? {
+        guard item.isDue, item.dueCount > 1 else { return nil }
+        return item.dueCount <= 1
+            ? "1 pago de \(Format.money(item.unitAmount, currency: currency))"
+            : "\(item.dueCount) pagos de \(Format.money(item.unitAmount, currency: currency))"
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(badgeText)
+                .font(.caption2.bold())
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(.tertiarySystemFill))
+                .foregroundStyle(.primary)
+                .clipShape(Capsule())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.payment.name)
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(item.account.name)
+                    if let multiLabel {
+                        Text("· \(multiLabel)")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(isCurrent ? .white.opacity(0.7) : .secondary)
+            }
+            Spacer()
+            Text(Format.money(item.share, currency: currency))
+                .fontWeight(.semibold)
+        }
+        .font(.subheadline)
     }
 }

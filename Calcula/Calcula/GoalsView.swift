@@ -182,74 +182,83 @@ struct GoalDetailView: View {
         let status = FinanceCalc.goalStatus(goal: goal)
         ScrollView {
             VStack(spacing: 24) {
-                // Anillo de progreso (la web usa radio 32; aquí ~60).
-                ZStack {
-                    Circle()
-                        .stroke(Color.gray.opacity(0.25), lineWidth: 12)
-                    Circle()
-                        .trim(from: 0, to: goal.progress)
-                        .stroke(Color.calculaAccent, style: StrokeStyle(lineWidth: 12, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    VStack(spacing: 2) {
+                // Hero: anillo con % + "Juntado $X de $Y" (como la web).
+                HStack(spacing: 20) {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.gray.opacity(0.25), lineWidth: 12)
+                        Circle()
+                            .trim(from: 0, to: goal.progress)
+                            .stroke(Color.calculaAccent, style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
                         Text("\(status.pct)%")
                             .font(.title.bold())
-                        Text("juntado")
-                            .font(.caption)
+                    }
+                    .frame(width: 120, height: 120)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Juntado")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text(Format.money(goal.saved, currency: currency))
+                            .font(.title2.bold())
+                        Text("de \(Format.money(goal.target, currency: currency))")
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
+                    Spacer()
                 }
-                .frame(width: 132, height: 132)
-                .padding(.top, 16)
 
-                Text(goal.name)
-                    .font(.title2.bold())
-
-                // Datos: Juntado / de / Resta / Cada X / Fecha.
-                VStack(spacing: 0) {
-                    detailRow(label: "Juntado", value: Format.money(goal.saved, currency: currency))
-                    detailRow(label: "Meta", value: Format.money(goal.target, currency: currency))
-                    detailRow(label: "Resta", value: Format.money(status.left, currency: currency))
-                    detailRow(
+                // Fichas: Resta / Cada quincena / Fecha (como la web).
+                HStack(spacing: 8) {
+                    goalFactBox(
+                        label: "Resta",
+                        value: Format.money(status.left, currency: currency)
+                    )
+                    goalFactBox(
                         label: "Cada \(cadenceLabel(for: goal.cadence))",
                         value: Format.money(status.each, currency: currency)
                     )
-                    if let deadline = goal.deadline {
-                        detailRow(label: "Fecha", value: Format.date(deadline))
-                    }
+                    goalFactBox(
+                        label: "Fecha",
+                        value: goal.deadline.map { Format.shortDate($0) } ?? "Sin fecha"
+                    )
                 }
-                .background(Color.calculaCard)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
 
+                // Botones: Compartir (principal) y Apartar / Editar.
                 VStack(spacing: 12) {
-                    Button("Apartar") { showingAdd = true }
+                    if let image = shareImage {
+                        ShareLink(
+                            item: ShareableImage(image: image),
+                            preview: SharePreview(goal.name, image: Image(uiImage: image))
+                        ) {
+                            Label("Compartir", systemImage: "square.and.arrow.up")
+                        }
                         .buttonStyle(.borderedProminent)
                         .tint(Color.calculaAccent)
                         .frame(maxWidth: .infinity)
+                    } else {
+                        ShareLink(item: shareText(status: status)) {
+                            Label("Compartir", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.calculaAccent)
+                        .frame(maxWidth: .infinity)
+                    }
 
                     HStack(spacing: 12) {
+                        Button("Apartar") { showingAdd = true }
+                            .buttonStyle(.bordered)
+                            .frame(maxWidth: .infinity)
                         Button("Editar") { showingEdit = true }
                             .buttonStyle(.bordered)
                             .frame(maxWidth: .infinity)
-
-                        if let image = shareImage {
-                            ShareLink(
-                                item: ShareableImage(image: image),
-                                preview: SharePreview(goal.name, image: Image(uiImage: image))
-                            )
-                                .buttonStyle(.bordered)
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            ShareLink(item: shareText(status: status))
-                                .buttonStyle(.bordered)
-                                .frame(maxWidth: .infinity)
-                        }
-
-                        Button("Eliminar", role: .destructive) {
-                            showingDeleteConfirm = true
-                        }
-                        .buttonStyle(.bordered)
-                        .frame(maxWidth: .infinity)
                     }
+
+                    Button("Eliminar meta", role: .destructive) {
+                        showingDeleteConfirm = true
+                    }
+                    .font(.subheadline)
                 }
             }
             .padding()
@@ -289,16 +298,22 @@ struct GoalDetailView: View {
         }
     }
 
-    private func detailRow(label: String, value: String) -> some View {
-        HStack {
+    /// Una ficha del detalle de meta (Resta / Cada quincena / Fecha),
+    /// como las `.goal-facts` de la web.
+    private func goalFactBox(label: String, value: String) -> some View {
+        VStack(spacing: 4) {
             Text(label)
+                .font(.caption)
                 .foregroundStyle(.secondary)
-            Spacer()
             Text(value)
-                .fontWeight(.semibold)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
-        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
+        .background(Color.calculaCard)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private func cadenceLabel(for cadence: String) -> String {
