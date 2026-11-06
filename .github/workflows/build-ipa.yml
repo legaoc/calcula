@@ -1,0 +1,34 @@
+name: Build Calcula IPA (Swift)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Compilar App
+      run: |
+        xcodebuild -project Calcula/Calcula.xcodeproj -scheme Calcula -configuration Release -sdk iphoneos CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -derivedDataPath Build/
+        APP_PATH="Build/Build/Products/Release-iphoneos/Calcula.app"
+        if [ ! -d "$APP_PATH" ]; then
+          echo "No se generó $APP_PATH"
+          ls -R Build/Build/Products/Release-iphoneos || true
+          exit 1
+        fi
+        rm -rf Payload
+        mkdir -p Payload
+        mv "$APP_PATH" Payload/
+        zip -r Calcula.ipa Payload
+
+    - name: Subir IPA a Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Calcula-IPA
+        path: Calcula.ipa
