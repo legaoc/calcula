@@ -123,41 +123,17 @@ struct HomeView: View {
                         .padding(.horizontal)
                     }
 
-                    Text("Movimientos recientes")
-                        .font(.headline)
-                        .padding(.horizontal)
-
-                    if store.movements.isEmpty {
-                        Text("Aún no hay movimientos.")
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                    } else {
-                        LazyVStack(spacing: 0) {
-                            ForEach(recentMovements) { movement in
-                                MovementRow(
-                                    movement: movement,
-                                    accountName: accountName(for: movement.accountId),
-                                    currency: currency
-                                )
-                                .contextMenu {
-                                    Button("Ver cuenta") {
-                                        selectedAccount = store.accounts.first {
-                                            $0.id == movement.accountId
-                                        }
-                                    }
-                                    Button("Eliminar", role: .destructive) {
-                                        movementToDelete = movement
-                                    }
-                                }
-                                if movement.id != recentMovements.last?.id {
-                                    Divider().padding(.leading, 16)
-                                }
+                    RecentMovementsSection(
+                        movements: recentMovements,
+                        accounts: store.accounts,
+                        currency: currency,
+                        onViewAccount: { movement in
+                            selectedAccount = store.accounts.first {
+                                $0.id == movement.accountId
                             }
-                        }
-                        .background(Color.calculaCard)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .padding(.horizontal)
-                    }
+                        },
+                        onDelete: { movement in movementToDelete = movement }
+                    )
                 }
                 .padding(.vertical)
             }
@@ -214,10 +190,6 @@ struct HomeView: View {
             }
             .sensoryFeedback(.impact, trigger: hapticTrigger)
         }
-    }
-
-    private func accountName(for id: String) -> String {
-        store.accounts.first { $0.id == id }?.name ?? "Cuenta"
     }
 
     /// Últimos 10 movimientos (igual que la web).
@@ -322,6 +294,60 @@ private struct DueReminderRow: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// Lista de movimientos recientes en Inicio (extraída del body para que el
+/// compilador verifique el tipo en tiempo razonable; mismo aspecto y
+/// comportamiento: fila con menú "Ver cuenta"/"Eliminar" y separador
+/// entre filas).
+private struct RecentMovementsSection: View {
+    let movements: [Movement]
+    let accounts: [Account]
+    let currency: String
+    let onViewAccount: (Movement) -> Void
+    let onDelete: (Movement) -> Void
+
+    var body: some View {
+        Group {
+            Text("Movimientos recientes")
+                .font(.headline)
+                .padding(.horizontal)
+
+            if movements.isEmpty {
+                Text("Aún no hay movimientos.")
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+            } else {
+                LazyVStack(spacing: 0) {
+                    ForEach(movements) { movement in
+                        MovementRow(
+                            movement: movement,
+                            accountName: accountName(for: movement.accountId),
+                            currency: currency
+                        )
+                        .contextMenu {
+                            Button("Ver cuenta") {
+                                onViewAccount(movement)
+                            }
+                            Button("Eliminar", role: .destructive) {
+                                onDelete(movement)
+                            }
+                        }
+                        if movement.id != movements.last?.id {
+                            Divider().padding(.leading, 16)
+                        }
+                    }
+                }
+                .background(Color.calculaCard)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal)
+            }
+        }
+    }
+
+    private func accountName(for id: String) -> String {
+        accounts.first { $0.id == id }?.name ?? "Cuenta"
     }
 }
 

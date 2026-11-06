@@ -161,7 +161,7 @@ private struct ShareableImage: Transferable {
     let image: UIImage
 
     static var transferRepresentation: some TransferRepresentation {
-        DataRepresentation(contentType: .png) { $0.image.pngData() ?? Data() }
+        DataRepresentation(exportedContentType: .png) { $0.image.pngData() ?? Data() }
     }
 }
 
