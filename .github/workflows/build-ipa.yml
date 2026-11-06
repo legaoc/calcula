@@ -15,7 +15,7 @@ jobs:
 
     - name: Compilar App
       run: |
-        xcodebuild -project Calcula/Calcula.xcodeproj -scheme Calcula -configuration Release -sdk iphoneos CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -derivedDataPath Build/
+        xcodebuild -project Calcula/Calcula.xcodeproj -scheme Calcula -configuration Release -sdk iphoneos CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CODE_SIGN_STYLE=Manual -derivedDataPath Build/
         APP_PATH="Build/Build/Products/Release-iphoneos/Calcula.app"
         if [ ! -d "$APP_PATH" ]; then
           echo "No se generó $APP_PATH"
