@@ -13,10 +13,26 @@ struct HomeView: View {
     @State private var showingPayroll = false
     @State private var hapticTrigger = 0
 
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Fase del saludo del encabezado, como `greetingPhase` de la web.
+    private enum GreetingPhase { case pending, playing, done }
+    @State private var greetingPhase: GreetingPhase = .pending
+    @State private var greetingOpacity = 0.0
+    @State private var greetingOffset = 0.0
+    @State private var nameOpacity = 0.0
+    @State private var nameOffset = 8.0
+    @State private var logoOpacity = 0.0
+    @State private var logoOffset = 8.0
+    @State private var backgroundedAt: Date?
+    @State private var greetingTask: Task<Void, Never>?
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    brandHeader
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Total pendiente")
                             .font(.subheadline)
@@ -172,28 +188,18 @@ struct HomeView: View {
                 .padding(.vertical)
             }
             .background(Color.calculaBackground)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Image("CalculaWordmark")
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 28)
-                        .foregroundStyle(.primary)
-                        .accessibilityLabel("Calcula")
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showingSearch = true } label: {
-                        Image(systemName: "magnifyingglass")
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink {
-                        SettingsView()
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
+            .toolbar(.hidden, for: .navigationBar)
+            .onAppear { startGreeting() }
+            .onChange(of: store.profile?.name) { _, _ in startGreeting() }
+            .onChange(of: store.profileLoaded) { _, _ in startGreeting() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background {
+                    backgroundedAt = Date()
+                } else if phase == .active {
+                    defer { backgroundedAt = nil }
+                    guard let hiddenAt = backgroundedAt,
+                          Date().timeIntervalSince(hiddenAt) >= 25 else { return }
+                    replayGreeting()
                 }
             }
             .sheet(isPresented: $showingSearch) {
@@ -227,6 +233,134 @@ struct HomeView: View {
             }
             .sensoryFeedback(.impact, trigger: hapticTrigger)
         }
+    }
+
+    /// Encabezado de Inicio (MAP.md §21 / web `.brand-mark`): fila propia
+    /// dentro del contenido, no barra de navegación. A la izquierda el
+    /// saludo o el logo DESNUDO, directo sobre el fondo, sin cápsula ni
+    /// burbuja (en la 1.2.2 el logo quedó en un ToolbarItem y en iOS 26
+    /// eso se ve dentro de una burbuja de Liquid Glass); a la derecha los
+    /// botones circulares de buscar y ajustes. La fila mide 44pt fijos
+    /// para que el cambio de saludo a logo no mueva el contenido.
+    private var brandHeader: some View {
+        HStack {
+            ZStack(alignment: .leading) {
+                Image("CalculaWordmark")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 28)
+                    .foregroundStyle(.primary)
+                    .accessibilityLabel("Calcula")
+                    .opacity(logoOpacity)
+                    .offset(y: logoOffset)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(greetingPhrase())
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text(firstName ?? "")
+                        .font(.system(size: 18, weight: .bold))
+                        .opacity(nameOpacity)
+                        .offset(y: nameOffset)
+                }
+                .opacity(greetingOpacity)
+                .offset(y: greetingOffset)
+            }
+            .frame(height: 44, alignment: .leading)
+            Spacer()
+            Button { showingSearch = true } label: {
+                Image(systemName: "magnifyingglass")
+                    .frame(width: 40, height: 40)
+                    .background(Color(.secondarySystemFill))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            NavigationLink {
+                SettingsView()
+            } label: {
+                Image(systemName: "gearshape")
+                    .frame(width: 40, height: 40)
+                    .background(Color(.secondarySystemFill))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+    }
+
+    /// Frase del saludo según la hora, como `greetingPhrase` de la web:
+    /// 5–12 "Buenos días", 12–19 "Buenas tardes", resto "Buenas noches".
+    private func greetingPhrase() -> String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        if hour >= 5 && hour < 12 { return "Buenos días" }
+        if hour >= 12 && hour < 19 { return "Buenas tardes" }
+        return "Buenas noches"
+    }
+
+    /// Primer nombre del perfil para saludar, como `firstName` de la web.
+    /// nil si no hay nombre (entonces se muestra el logo directo).
+    private var firstName: String? {
+        let name = (store.profile?.name ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.split(separator: " ").first.map(String.init)
+    }
+
+    /// Arranca el saludo del encabezado, como `startGreeting` de la web.
+    /// Solo se reproduce una vez por sesión en primer plano: si no hay
+    /// nombre y el perfil ya cargó, queda el logo directo; si el perfil
+    /// aún no cargó, no hace nada y se reintenta cuando cargue.
+    private func startGreeting() {
+        guard greetingPhase == .pending else { return }
+        guard firstName?.isEmpty == false else {
+            if store.profileLoaded {
+                greetingPhase = .done
+                logoOpacity = 1
+                logoOffset = 0
+            }
+            return
+        }
+        greetingPhase = .playing
+        greetingOpacity = 1
+        greetingOffset = 0
+        nameOpacity = 0
+        nameOffset = 8
+        logoOpacity = 0
+        logoOffset = 8
+        // Entrada del nombre, como `.brand-hello strong` de la web
+        // (helloIn .5s ease .12s): la frase aparece directa.
+        withAnimation(.easeOut(duration: 0.5).delay(0.12)) {
+            nameOpacity = 1
+            nameOffset = 0
+        }
+        greetingTask?.cancel()
+        greetingTask = Task {
+            // A los 2400 ms el saludo empieza a desvanecerse (helloOut .4s).
+            try? await Task.sleep(for: .milliseconds(2400))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.4)) {
+                greetingOpacity = 0
+                greetingOffset = -7
+            }
+            // 380 ms después aparece el logo con su entrada (brand-in .48s).
+            try? await Task.sleep(for: .milliseconds(380))
+            guard !Task.isCancelled else { return }
+            greetingPhase = .done
+            withAnimation(.easeIn(duration: 0.48)) {
+                logoOpacity = 1
+                logoOffset = 0
+            }
+        }
+    }
+
+    /// Vuelve a reproducir el saludo, como `replayGreeting` de la web.
+    private func replayGreeting() {
+        guard firstName?.isEmpty == false else { return }
+        greetingTask?.cancel()
+        greetingPhase = .pending
+        startGreeting()
     }
 
     /// Últimos 10 movimientos (igual que la web).
