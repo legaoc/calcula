@@ -1075,3 +1075,61 @@ como en el video. La web ya hace exactamente esto y se replicó su lógica
 5. **Versión** — MARKETING_VERSION 1.2.3 y CURRENT_PROJECT_VERSION 6
    (Debug y Release, pbxproj + Info.plist). CHANGELOG.md con la entrada
    de la 1.2.3 (2026-11-06).
+
+## 22. VERSIÓN 1.2.4: BÚSQUEDA EXPANDIBLE EN EL ENCABEZADO, COMO EL VIDEO (6 nov 2026)
+
+### Referencia verificada (video de otra app, 5.15 s)
+- Colapsado: fila con avatar circular "JD", píldora "Buscar" (lupa + texto),
+  botón circular de gráfica y botón circular de tarjeta.
+- Al tocar la píldora: se expande con animación hasta ocupar casi todo el ancho
+  de la fila; los demás botones se desvanecen; la píldora muestra el campo de
+  texto con el cursor y el placeholder `Buscar "TFL, Starbucks, Amazon, etc."`
+  y aparece un botón circular X a la derecha de la píldora.
+- Al tocar la X: la píldora se contrae con la animación inversa y los botones
+  vuelven a aparecer.
+
+### Cambios (`HomeView.swift` + `SearchView.swift`)
+1. **Píldora en el encabezado** — `brandHeader` colapsado: logo/saludo a la
+   izquierda, `Spacer`, píldora "Buscar" (lupa + texto, cápsula
+   `Color(.secondarySystemFill)`, 40pt de alto) y botón circular de ajustes.
+   La píldora sustituye al botón circular de lupa de la 1.2.3 (que abría
+   `SearchView` como hoja con `.sheet` — eliminado).
+2. **`searchPill` (misma vista en los dos estados)** — Colapsada muestra lupa +
+   "Buscar" con ancho intrínseco; expandida muestra el `TextField`
+   (placeholder "Buscar cuentas, movimientos, metas…", sin autocapitalización
+   ni autocorrección, `.submitLabel(.search)`) y `maxWidth: .infinity`, así
+   que el cambio de ancho se anima con el spring. `.contentShape(Capsule())`
+   para que toda la píldora sea tocable.
+3. **Expansión/colapso** — `expandSearch()` / `collapseSearch()` con
+   `withAnimation(.spring(response: 0.4, dampingFraction: 0.85))` y el mismo
+   spring en `.animation(..., value: searchExpanded)` del encabezado: la
+   píldora crece, el logo/saludo y ajustes se desvanecen (`.transition(.opacity)`)
+   y la X entra con opacidad + escala 0.8. El teclado se abre 120 ms después
+   de expandir (`searchFocused = true` por `Task`, cuando el campo ya existe
+   en la jerarquía). La X limpia el texto, cierra el teclado y contrae con la
+   animación inversa. `.scrollDismissesKeyboard(.interactively)` en el
+   `ScrollView` de Inicio.
+4. **Resultados en línea** — El contenido de Inicio se envuelve en
+   `if searchExpanded { SearchView(query: $searchQuery) } else { ... }` (mismo
+   `ScrollView`, sin hoja). `SearchView` ya no es una hoja: sin
+   `NavigationStack`/`navigationTitle`/`toolbar`/`dismiss`/`@FocusState` y sin
+   su propio campo (`searchField` eliminado, el campo vive en la píldora);
+   recibe `@Binding var query`. `hintView`/`emptyView` sin `maxHeight: .infinity`
+   (rompía el layout dentro del `ScrollView` de Inicio). `resultsList` ya no
+   es `List` (no anida bien dentro de otro `ScrollView`): `LazyVStack` con
+   encabezados de sección y separadores, como el resto de Inicio. Misma lógica
+   de búsqueda (secciones, máx. 40, sin acentos, monto y fecha).
+5. **Navegación a detalles** — Los `NavigationLink(value: SearchDestination...)`
+   de los resultados usan el `NavigationStack` de Inicio: `SearchDestination`
+   pasó de `private` a interno y su destino vive en `SearchDestinationView`
+   (struct en `SearchView.swift`, resuelve el objeto vivo por id), registrado
+   en Inicio con `.navigationDestination(for: SearchDestination.self)`.
+6. **Saludo sin cruces** — `expandSearch()` llama a `finishGreeting()`
+   (cancela `greetingTask`, fase `done`, logo fijo). `startGreeting()` no
+   arranca el saludo si la búsqueda está abierta (queda el logo directo),
+   así el perfil puede cargar mientras se busca sin dejar el logo invisible.
+7. **Sin cambios en Ajustes** — el botón de ajustes sigue siendo el
+   `NavigationLink` a `SettingsView()` de siempre. Sin assets nuevos.
+8. **Versión** — MARKETING_VERSION 1.2.4 y CURRENT_PROJECT_VERSION 7
+   (Debug y Release, pbxproj + Info.plist). CHANGELOG.md con la entrada
+   de la 1.2.4 (2026-11-06).

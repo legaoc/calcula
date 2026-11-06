@@ -3,6 +3,10 @@
 La app muestra este historial en Ajustes → Historial de versiones.
 La versión actual también se ve en Ajustes, abajo del todo.
 
+## 1.2.4 — 2026-11-06 — Búsqueda expandible en el encabezado, como el video
+- Inicio: al tocar la píldora "Buscar" del encabezado, se expande con un spring hasta ocupar la fila, el logo/saludo y el botón de ajustes se desvanecen, aparece el campo de texto con el teclado abierto y un botón circular X a la derecha. Los resultados (Cuentas / Movimientos / Metas / Presupuestos) se muestran en línea debajo del encabezado, en la misma pantalla, sin hoja desde abajo. Al tocar la X se limpia el texto, se cierra el teclado y la píldora se contrae con la animación inversa.
+- Si el saludo de la 1.2.3 todavía estaba en curso al tocar buscar, queda el logo (no se cruzan las animaciones). El botón de ajustes sigue abriendo Ajustes como antes.
+
 ## 1.2.3 — 2026-11-06 — Saludo en Inicio que se convierte en logo, como la web
 - Inicio: el encabezado ahora saluda ("Buenos días" / "Buenas tardes" / "Buenas noches" + primer nombre del perfil, frase en regular y nombre en negrita y más grande) y a los 2.4 s se desvanece para dar paso al logo "Calcula" con su animación de entrada, como la web. Si no hay nombre, muestra el logo directo. Si la app vuelve de segundo plano tras 25 s o más, el saludo se reproduce de nuevo.
 - El logo ya no va en la barra de navegación (ahí se veía dentro de una burbuja): ahora es una fila propia dentro del contenido, con el logo desnudo directo sobre el fondo y los botones circulares de buscar y ajustes a la derecha, como en la web.
