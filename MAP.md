@@ -820,3 +820,147 @@ oscuro, Inicio y detalle de meta en claro) y el marcado real de la web
    - El vidrio líquido / blur de la web: no se replica; las tarjetas
      usan `Color.calculaCard`, el token del sistema que ya usaba la
      app.
+
+## 19. VERSIÓN 1.2.1: HUECOS DEL INVENTARIO DE LA WEB (6 nov 2026)
+
+Cada hueco de la sección final de `WEB-INVENTORY.md` se verificó contra
+el código actual antes de tocarlo; dos ya estaban cubiertos y se
+documentan aquí (no se tocaron). Referencia: el código real de la web
+(`~/workspace/psnlgastos-app/www/index.html` y el original
+`legaoc/psnlgastos` HEAD `3c2bfdd`) y las secciones de
+`WEB-INVENTORY.md` citadas.
+
+1. **"Próximos pagos" en Inicio** (`HomeView.swift`) — Renglones como
+   `renderUpcoming`: flecha ↗ (o "!" roja si está vencido), nombre del
+   pago, nombre de la cuenta, fecha "En 2 días · 8 nov 2026" (nuevo
+   `upcomingDateText`: etiqueta relativa de `dateDescription` + " · " +
+   fecha completa), monto y botón "Pagar" por fila (abre
+   `MarkPaymentSheet`). Vacío: "No tienes pagos programados.". Solo
+   los primeros 5, como la web.
+2. **Hoja "Marcar pago"** (`HomeView.swift`, nuevo `MarkPaymentSheet`)
+   — Como `openPayScheduledModal`: título, subtítulo "{nombre} ·
+   {frecuencia o 'Pago N de M'}", caja "Monto" + cantidad grande +
+   "Programado para 8 nov 2026", botones "Cancelar" y "Marcar como
+   pagado" (llama `store.payScheduled`: crea el movimiento tipo
+   "pago" y avanza `nextPayment` con `nextOccurrence`). La usa Inicio,
+   Quincena y el detalle de cuenta. Se quitó la alerta de
+   confirmación anterior de `HomeView` y el flujo `payingItemId` /
+   `payError` / `pay(_:)` de `QuincenaView`.
+3. **Hoja "Tu Nómina"** (`QuincenaView.swift`, nuevo `PayrollSheet`)
+   — Como `openPayrollSettingsModal`: "Primera quincena" Picker Día
+   1–15; "Segunda quincena" Picker (0 = Último día del mes; 16, 17,
+   18, 20, 25, 28, 30); Cancelar / Guardar (`store.setPayroll`,
+   `payday2` = 30 como marcador cuando es último día, más
+   `payday2LastDay`). Se abre desde el botón "Nómina" del encabezado
+   "Para estar al día" (Inicio) y desde la barra de Quincena (antes
+   el enlace "Nómina" del §18.2 no llevaba a nada).
+4. **"Reparte el dinero que te sobra"** (`DiferirView.swift`) — La
+   sección NO existe en el código de la web disponible: ni el clon
+   local (404,578 bytes, 5 nov 22:58) ni el original en HEAD
+   `3c2bfdd` tienen "sobra", "sin asignar", "Quedo", "Reparto sujeto
+   a cambios" ni "Disponible para diferir" (su `renderDeferTab` tiene
+   solo héroe + "Diferir una cantidad" + lista de pagos); el sitio en
+   vivo sirve una versión más nueva. Se implementó la estructura con
+   datos reales: "Por quincena" = suma de los pagos donde
+   `QuincenaEngine.canDefer` es true; "Diferido" = suma de los pagos
+   con `splitCount > 1`; tabla Q1–Q5 con parte igual por quincena y
+   "Quedo" = lo que queda del total tras cada quincena. **Caveat**:
+   los números del inventario ($1,359.00 "Por quincena", Q1 $18.10 y
+   Q2–Q5 $296.60, "Quedo" $1,340.90 / $455.70 / $159.10 / $0.00)
+   siguen una fórmula que no está en ninguna fuente disponible: con
+   los datos de Jesus, el total deferible es $1,349.00 (Apple $49 +
+   Perfume $1,300), $10 menos que los $1,359.00 del sitio, y el
+   reparto del sitio no es en partes iguales. Si Jesus quiere el
+   cálculo exacto, hay que ver la versión nueva de la web.
+5. **Detalle de cuenta** (`AccountsView.swift`) — Reescrito con héroe
+   oscuro del color de la tarjeta (texto blanco): recurrente →
+   "Próximo pago" + cantidad grande + "{frecuencia} · {fecha corta}"
+   + botón "Registrar pago" a lo ancho (abre `MarkPaymentSheet`);
+   cargos → "Saldo pendiente" + cantidad grande + "Cargos y abonos"
+   + botones "+ Cargo" (blanco) y "Abono" (borde blanco) que abren
+   `AddMovementView` con la cuenta y el tipo preseleccionados (nuevo
+   parámetro `preselectedKind`). Se mantienen las filas Tipo / Día,
+   la sección Movimientos (vacío "Todavía no hay movimientos en esta
+   cuenta.") y la sección de eliminar. El "+" de la barra se cambió
+   por un lápiz que abre `EditCardSheet`.
+6. **Hoja "Editar tarjeta"** (`AccountsView.swift`, nuevo
+   `EditCardSheet`) — Como `openAccountStyleModal`: cuadrícula de 20
+   colores (`ThemePalette`, ahora en `Theme.swift` para compartirla)
+   + "Crear color" (`ColorPicker`); interruptor "Visible en el
+   inicio — Si la apagas, sigue existiendo" (guarda
+   `hiddenFromHome`); campo "Icono" (placeholder "Netflix, Izzi,
+   Telmex…") y campo "O el sitio web" (placeholder "netflix.com",
+   `iconDomain`); botones "Editar datos" (abre `EditPaymentSheet` o
+   `EditChargeAccountSheet` según el tipo), "Eliminar cuenta"
+   (destructivo) y "Guardar" (`updateAccount` +
+   `updatePaymentIcon`, que sincroniza `iconSlug`/`iconHex`/
+   `iconDomain` al pago programado, como la web). Color por defecto
+   cuando falta: "38383d" recurrente / "242428" cargos.
+7. **Hoja "Editar pago"** (`AccountsView.swift`, nuevo
+   `EditPaymentSheet`) — Como `openEditAccountModal` (recurrente):
+   nombre de la cuenta, nombre del pago, monto, frecuencia (las 8 de
+   la web) y próximo pago (`DatePicker`); guarda `{name, amount,
+   frequency, nextPayment}` sin `customDays`, como la web. Para
+   cargos, `EditChargeAccountSheet`: nombre + "Día de pago ·
+   opcional" (Sin fecha / Día 1–31); guarda `{name, dueDay}`.
+8. **Calendario — puntos por color: YA CUBIERTO** (no se tocó).
+   Verificado contra el código de la web: los puntos NO son por
+   categoría (rojo/azul/gris); `accountDotColor(account)` devuelve el
+   `cardColor` de la cuenta si es un hex válido, si no `#5c5c66`
+   (recurrente) o `#2a2a30`. El rojo/azul/gris de las capturas de
+   Jesus son los colores de SUS tarjetas (Elektra #e22400, Telmex
+   #01c7fc, Apple y Perfume Martin #242428). La 1.2 ya usa
+   `Color(hex: account.cardColor ?? "242428")` y el comentario lo
+   explica. **Tampoco se tocó el filtrado**: `eventsByDay` ya viene
+   de `filteredEvents`, así que los puntos ya respetan el filtro
+   activo.
+9. **Calendario — resto** (`CalendarView.swift`) — `selectedDay` ahora
+   es `Date?` (`nil` = ninguno): al cambiar de mes se limpia y la
+   sección muestra "Elige un día" + "No hay pagos este día."; botón
+   "Volver arriba" (aparece al bajar 200 pt, `ScrollViewReader` +
+   `ScrollOffsetKey` PreferenceKey; iOS 17 no tiene
+   `onScrollGeometryChange`).
+10. **Ajustes: acordeón de 7 filas** (`SettingsView.swift`) — Solo una
+    expandida a la vez; Cerrar sesión es destructivo y abre la alerta
+    (sin chevron). Cuentas: Nueva cuenta (cargos, pago o
+    subscripción), Tarjetas del inicio (nueva vista `HomeCardsView`:
+    interruptor Visible + cuadrícula de color por cuenta, con
+    `setAccountHidden` / `setAccountColor`), Orden de tarjetas
+    (reordenar existente). Dinero: Mi perfil (abre
+    `OnboardingView(editing: true)`; subtítulo "{frecuencia} · {moneda}"),
+    Nuevo presupuesto (`BudgetFormView`), Nueva meta (`GoalFormView`).
+    Apariencia: "Modo nocturno" con la misma clave `calcula-dark` de
+    la web. Recordatorios: Activar (avisos en la app, 1/2 días de
+    antelación con segmented), avisos fuera de la app (toggle con
+    `NotificationService.remindersEnabled`) y "Agregar a Calendario"
+    (.ics, builder existente). Exportar: CSV del mes y de la
+    quincena (builders existentes). Sistema: "Actualizar app" (texto
+    que explica que se actualiza desde FlareStore), Sincronización
+    (estado, toggle nube, "Sincronizar ahora", antes sección propia)
+    y Face ID (antes sección propia). "Acceso para Atajos" sigue sin
+    implementarse (copia un token sensible; decisión de la 1.0).
+    Se eliminó `ProfileEditView` (el formulario único de 6 campos) y
+    `ProfileIncomeOption`, reemplazados por el editor de 4 pasos. La
+    sección "Historial de versiones" y el pie de versión quedan
+    debajo del acordeón, sin cambios.
+11. **Editor de perfil de 4 pasos** (`OnboardingView.swift`) — Modo
+    edición: `init(editing: Bool = false)`; en edición muestra "Toca
+    aquí para salir del editor" arriba, el paso 0 tiene "Cancelar",
+    el botón final dice "Guardar" y al terminar cierra la hoja (la
+    web reutiliza el onboarding con `editingProfile=true`). Lo usa
+    Ajustes → Dinero → Mi perfil.
+12. **Aviso ámbar "Por pagar"** (`HomeView.swift`) — Reestilizado
+    como la web: fondo ámbar tenue, icono naranja, una línea por pago
+    vencido/próximo ("En 2 días · Pago semanal · $216.00"). El texto
+    relativo se unificó con `dateDescription` ("Vencido ayer" /
+    "Vencido hace N días" / "Hoy" / "Mañana" / "En N días" / fecha
+    corta). Se quitó el struct `DueReminderRow` (sin uso).
+13. **Soporte en DataStore** (`DataStore.swift`) — `updateAccount(id:
+    patch:)` (actualización parcial genérica de cuenta) y
+    `updatePaymentIcon(accountId:slug:hex:domain:)` (sincroniza los
+    campos de icono al pago programado, como la web).
+14. **Versión** — MARKETING_VERSION 1.2.1 y
+    CURRENT_PROJECT_VERSION 4 (Debug y Release, pbxproj + Info.plist).
+    CHANGELOG.md con la entrada de la 1.2.1 (2026-11-06). Sin archivos
+    nuevos: todas las vistas nuevas viven en archivos existentes (no
+    hay que registrar nada en el pbxproj).
