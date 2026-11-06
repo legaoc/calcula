@@ -685,3 +685,44 @@ anteriores (§14 y §15, arreglados). Quedaban estos 2:
 Verificado: cero patrones que fallaban (grep), llaves, paréntesis y
 corchetes balanceados en los 2 archivos editados. Sin compilador Swift
 en Linux: la prueba real es el siguiente run de GitHub Actions.
+
+## 17. VERSIÓN 1.1: REORDENAR TARJETAS POR DRAG Y BÚSQUEDA GLOBAL (6 nov 2026)
+
+La 1.0 quedó en verde (run #16 SUCCESS). La 1.1 agrega solo estas 2
+funciones; nada de la 1.0 cambia de comportamiento.
+
+1. **Reordenar tarjetas por drag** — Antes, Ajustes → Orden de
+   tarjetas (`ReorderAccountsView`, SettingsView) exigía tocar
+   "Editar" para que aparecieran los tiradores de arrastre. Ahora la
+   lista vive siempre en modo de edición
+   (`.environment(\.editMode, .constant(.active))`) y se arrastra
+   directo con el dedo, sin botón "Editar". El guardado no cambió:
+   `move` llama a `DataStore.reorderAccounts`, que persiste
+   `sortOrder` por cuenta en Firestore; la suscripción de cuentas ya
+   ordena por `sortOrder`, así que el orden sobrevive al cerrar la
+   app y es el mismo que ve la web (campo `sortOrder` existente,
+   §1.2). No se renumeró nada: las cuentas actuales conservan su
+   orden relativo.
+2. **Búsqueda global** — Nuevo `SearchView.swift` (registrado en el
+   pbxproj como `SearchView.swift in Sources`). Se abre con la lupa
+   de la barra de Inicio (junto al engrane de ajustes). Busca en
+   vivo, máx. 40 resultados (como la web, §3.6), en secciones
+   Cuentas / Movimientos / Metas / Presupuestos:
+   - Cuentas por nombre; metas por nombre; presupuestos por nombre
+     o categoría.
+   - Movimientos (todos, `financeMovements`) por nota, categoría,
+     nombre de la cuenta, tipo, cantidad exacta o texto formateado,
+     y fecha ("5 dic 2026" o "05/12/2026").
+   - Comparación sin acentos ni mayúsculas (`folding`
+     diacriticInsensitive + caseInsensitive, es_MX).
+   - Al tocar un resultado abre su detalle: cuenta →
+     `AccountDetailView`, movimiento → la cuenta de ese movimiento,
+     meta → `GoalDetailView`, presupuesto → `BudgetDetailView`
+     (nuevo, mínimo, en BudgetsView.swift: la fila del presupuesto
+     + eliminar; los presupuestos no tenían pantalla de detalle).
+   - La búsqueda vive en su propio `NavigationStack` dentro de la
+     hoja, así que no interfiere con las pestañas.
+3. **Versión** — MARKETING_VERSION 1.1 y CURRENT_PROJECT_VERSION 2
+   (Debug y Release). CHANGELOG.md con la entrada de la 1.1
+   (2026-11-06); Ajustes → Historial de versiones la muestra como
+   "Actual" sola, porque lee del Bundle y del CHANGELOG.
