@@ -33,6 +33,15 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            Image("CalculaWordmarkLarge")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(height: 24)
+                .foregroundStyle(.primary)
+                .accessibilityLabel("Calcula")
+                .padding(.top, 12)
+
             if editing {
                 Button("Toca aquí para salir del editor") { dismiss() }
                     .font(.subheadline)

@@ -15,8 +15,13 @@ struct LoginView: View {
                 Spacer(minLength: 60)
 
                 VStack(spacing: 8) {
-                    Text("Calcula")
-                        .font(.system(size: 44, weight: .bold))
+                    Image("CalculaWordmarkLarge")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 44)
+                        .foregroundStyle(.primary)
+                        .accessibilityLabel("Calcula")
                     Text("Tus gastos, en orden")
                         .foregroundStyle(.secondary)
                 }

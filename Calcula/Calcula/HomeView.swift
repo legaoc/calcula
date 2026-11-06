@@ -172,8 +172,17 @@ struct HomeView: View {
                 .padding(.vertical)
             }
             .background(Color.calculaBackground)
-            .navigationTitle("Inicio")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Image("CalculaWordmark")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 28)
+                        .foregroundStyle(.primary)
+                        .accessibilityLabel("Calcula")
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showingSearch = true } label: {
                         Image(systemName: "magnifyingglass")
