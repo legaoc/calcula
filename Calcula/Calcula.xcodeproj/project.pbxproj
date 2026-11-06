@@ -32,7 +32,6 @@
 		00000000000000000000103D /* VersionHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000103E /* VersionHistory.swift */; };
 		000000000000000000001046 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000001047 /* FirebaseAuth */; };
 		000000000000000000001048 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000001049 /* FirebaseFirestore */; };
-		00000000000000000000104A /* FirebaseFirestoreSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 00000000000000000000104B /* FirebaseFirestoreSwift */; };
 		00000000000000000000103F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001041 /* Assets.xcassets */; };
 		000000000000000000001040 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001042 /* GoogleService-Info.plist */; };
 		000000000000000000001044 /* CHANGELOG.md in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001045 /* CHANGELOG.md */; };
@@ -76,7 +75,6 @@
 			files = (
 				000000000000000000001046 /* FirebaseAuth in Frameworks */,
 				000000000000000000001048 /* FirebaseFirestore in Frameworks */,
-				00000000000000000000104A /* FirebaseFirestoreSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -152,7 +150,6 @@
 			packageProductDependencies = (
 				000000000000000000001047 /* FirebaseAuth */,
 				000000000000000000001049 /* FirebaseFirestore */,
-				00000000000000000000104B /* FirebaseFirestoreSwift */,
 			);
 			productName = Calcula;
 			productReference = 000000000000000000001006 /* Calcula.app */;
@@ -450,11 +447,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 000000000000000000001010 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
-		};
-		00000000000000000000104B /* FirebaseFirestoreSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 000000000000000000001010 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseFirestoreSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
