@@ -726,3 +726,97 @@ funciones; nada de la 1.0 cambia de comportamiento.
    (Debug y Release). CHANGELOG.md con la entrada de la 1.1
    (2026-11-06); Ajustes → Historial de versiones la muestra como
    "Actual" sola, porque lee del Bundle y del CHANGELOG.
+
+## 18. VERSIÓN 1.2: DETALLE DE TARJETAS COMO LA WEB, CON INTERFAZ NATIVA DE iOS (6 nov 2026)
+
+Jesus probó la 1.0: todo funciona, pero las tarjetas se ven "planas",
+sin el detalle de la web. Aclaró que NO son los colores (sus capturas
+tienen modo oscuro y claro) y que la presentación debe ser la interfaz
+original de Apple: mismo contenido, funciones y detalles que la web,
+pero con controles estándar de SwiftUI (navegación, sheets, segmented
+control, botones del sistema), sin copiar el estilo visual web
+(gradientes, vidrio, controles a medida). Referencia: las 5 capturas
+de Jesus (`~/workspace/user/files/`, Calendario / Finanzas / Diferir en
+oscuro, Inicio y detalle de meta en claro) y el marcado real de la web
+(`renderCarousel`, `renderQuincenaCard`, `openGoalDetail`,
+`renderCalendar`, `renderFinance`, `renderDeferTab`,
+`renderBudgetList`).
+
+1. **Tarjeta de cuenta** (`HomeView.swift`, `AccountCard`) — Mismo
+   contenido que `renderCarousel`: tipo "Subscripción" / "Pago
+   recurrente" / "Cargos y abonos" (antes decía "Recurrente"/"Cargos"),
+   etiqueta "Próximo pago" / "Saldo pendiente" / "Esta quincena",
+   cantidad grande (37→34pt), estado con la lógica completa de la web
+   (`summarizeAccountItems` replicado en local: "Cada mes · 31 oct",
+   "Apartar $X esta quincena", "Pagar el día X · esta quincena /
+   vencido / siguiente quincena", "Tienes saldo a favor", "Cuenta
+   liquidada", "Tienes un saldo pendiente", "Sin pago programado",
+   "N pagos de $X" cuando hay varios vencidos esta quincena) y el
+   aviso "Toca para ver movimientos". `dueDescription` replica
+   `dateDescription` ("Hoy" / "Mañana" / "En N días" / "Vencido ayer /
+   hace N días" / fecha corta). Tarjeta más grande (280×210, antes
+   180×120) para que quepa el contenido. Datos: `DataStore` ya tenía
+   el pago por cuenta (`scheduledPayments`) y los planes de quincena
+   (`buildQuincenaPlan`); `HomeView` calcula el plan actual y el
+   siguiente una vez y se los pasa a la tarjeta.
+2. **Tarjeta de quincena** (`QuincenaView.swift`, `QuincenaCard`) —
+   Misma estructura que `renderQuincenaCard`: cabecera con "Esta
+   quincena" / "Nómina del 30 sep" / "Cubre 30 sep – 15 oct" a la
+   izquierda y la cantidad grande con "de tu nómina" a la derecha;
+   dos cajas siempre visibles "Pagar ahora $X" / "Apartar $X"; lista
+   compacta con insignia ("Pagar" / "Vencido" / "Apartar N/M"),
+   nombre, cuenta (y "· N pagos de $X" si hay varios vencidos) y
+   parte de la quincena; si no hay ítems, la barra "No te toca pagar
+   ni apartar nada aquí.". Fechas cortas ("30 sep", sin año) con
+   `Format.shortDate` (nuevo en Theme.swift). El enlace "Nómina" del
+   encabezado de la sección NO se añadió: no existe ninguna pantalla
+   de ajustes de nómina en Swift a la que llevar (pendiente aparte).
+3. **Detalle de meta** (`GoalsView.swift`, `GoalDetailView`) — Como
+   `openGoalDetail`: anillo con solo el % al lado de "Juntado $X" +
+   "de $Y"; tres fichas (Resta / Cada quincena / Fecha, con fecha
+   corta "15 dic" o "Sin fecha"); botón Compartir principal a lo
+   ancho (mismo ShareLink con la imagen renderizada o el texto) y
+   fila Apartar / Editar; "Eliminar meta" queda como botón
+   destructivo de texto (la web no lo tiene en el detalle, pero la
+   acción existe en Swift y se conserva).
+4. **Calendario** (`CalendarView.swift`) — Filtros "Todas 6" sin
+   paréntesis; días "L M M J V S D" (miércoles era "X"); mes con
+   flechas + filtros y rejilla agrupados en tarjetas, como las tres
+   secciones de la foto; día seleccionado con relleno del sistema
+   (visible en claro y oscuro) y día del próximo pago con anillo
+   (`is-next` de la web); "Pagos del 30" (solo el número del día) con
+   filas nombre + tipo ("Subscripción" / "Pago semanal" / "Cargo" /
+   "Pago recurrente", como la web) sin fecha; si hoy no hay pagos:
+   "Sin pago en ese día." + "Próximo pago: 30 sep · Apple · $49.00".
+5. **Finanzas** (`FinanceView.swift`) — Héroe en el orden de la web:
+   "Gastado {periodo}", cantidad grande, delta y el selector
+   Día/Semana/Mes/Año al final (el segmented control es el patrón
+   nativo; la web tiene un pill a medida). Delta con "vs …" siempre:
+   "Nuevo gasto vs el año pasado" / "Sin cambios vs el mes pasado" /
+   "X% más/menos que …". Gráfica "Comparativa" con leyenda de mínimo
+   y máximo ("$0.00" … "$1,833.00"). Presupuestos: texto vacío "Aún
+   no tienes un tope del mes." y botón "Nuevo presupuesto" a lo ancho
+   debajo (antes estaba en el encabezado).
+6. **Diferir** (`DiferirView.swift`) — Héroe con "Diferir" pequeño +
+   "Reparte un pago" en título grande + el texto de la web ("Elige un
+   pago que ya tienes, o una cantidad, y júntalo en semanas,
+   quincenas o meses."); botón "Diferir una cantidad" a lo ancho;
+   sección "¿Qué pago quieres diferir?"; filas con fecha corta y
+   cuenta ("30 sep · Apple"); vacío "Todavía no hay pagos. Puedes
+   diferir una cantidad.".
+7. **Versión** — MARKETING_VERSION 1.2 y CURRENT_PROJECT_VERSION 3
+   (Debug y Release, pbxproj + Info.plist). CHANGELOG.md con la
+   entrada de la 1.2 (2026-11-06).
+8. **Detalles de la web sin equivalente nativo directo** (patrón
+   nativo más cercano usado):
+   - El degradado y el brillo de las tarjetas de cuenta de la web
+     (`linear-gradient 145deg` por `cardColor`): la tarjeta Swift
+     sigue siendo el color plano de la tarjeta, como ya era.
+   - El period-switch a medida de la web: segmented control nativo.
+   - Las celdas de calendario de la web (rectángulo redondeado con
+     número arriba y puntos abajo): se mantienen las celdas
+     circulares nativas de Swift, con los estados (hoy / seleccionado
+     / próximo pago) resueltos con colores del sistema.
+   - El vidrio líquido / blur de la web: no se replica; las tarjetas
+     usan `Color.calculaCard`, el token del sistema que ya usaba la
+     app.
